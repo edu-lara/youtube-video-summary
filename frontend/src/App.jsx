@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 
-const API_URL = 'https://lw3dkifimsb6xtfnsmvhviiizu0ggeuq.lambda-url.us-east-1.on.aws'
+const API_URL = 'const API_URL = import.meta.env.VITE_API_URL;'
 
 const translations = {
   en: {
