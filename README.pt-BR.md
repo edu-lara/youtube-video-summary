@@ -262,9 +262,13 @@ O resultado final é uma aplicação serverless focada em resolver uma tarefa re
 
 ---
 
-## Link do repositório
+## Demonstração ao Vivo
 
-[edu-lara/youtube-video-summary](https://github.com/edu-lara/youtube-video-summary)
+Experimente a aplicação:
+
+[Abrir o YouTube Video Summary](https://main.d25avzzlw30qwi.amplifyapp.com/)
+
+> **Observação:** A demonstração ao vivo estará disponível por tempo limitado.
 
 ---
 

@@ -262,9 +262,13 @@ The final result is a focused serverless application that solves one repetitive 
 
 ---
 
-## Link to Repo
+## Live Demo
 
-[edu-lara/youtube-video-summary](https://github.com/edu-lara/youtube-video-summary)
+Try the application here:
+
+[Open YouTube Video Summary](https://main.d25avzzlw30qwi.amplifyapp.com/)
+
+> **Note:** The live demo is available for a limited time.
 
 ---
 
