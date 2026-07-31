@@ -99,7 +99,7 @@ function App() {
         };
 
         throw new Error(
-          errorMessages[data.error] || t.genericError
+          errorMessages[data.error] || text.genericError
         );
       }
 
