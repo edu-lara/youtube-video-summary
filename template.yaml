@@ -32,7 +32,7 @@ Resources:
         InvokeMode: BUFFERED
         Cors:
           AllowOrigins:
-            - "*"
+            - "https://main.d25avzzlw30qwi.amplifyapp.com"
           AllowMethods:
             - POST
           AllowHeaders:
