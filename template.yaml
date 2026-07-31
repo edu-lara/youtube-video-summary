@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Versão mínima de uma aplicação que recebe uma URL do YouTube,
+  obtém a legenda e gera um resumo com Amazon Bedrock.
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures:
+      - arm64
+    MemorySize: 512
+    Timeout: 120
+    Tracing: Active
+    Environment:
+      Variables:
+        BEDROCK_MODEL_ID: amazon.nova-micro-v1:0
+        SUPADATA_PARAMETER_NAME: /youtube-summary/supadata-api-key
+
+Resources:
+  VideoSummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: youtube-video-summary
+      Description: Obtém a legenda de um vídeo e gera um resumo.
+      CodeUri: backend/
+      Handler: app.lambda_handler
+
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+        Cors:
+          AllowOrigins:
+            - "*"
+          AllowMethods:
+            - POST
+          AllowHeaders:
+            - content-type
+          MaxAge: 600
+
+      Policies:
+        - Statement:
+            - Sid: InvokeNovaMicro
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-micro-v1:0
+
+            - Sid: ReadSupadataParameter
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/youtube-summary/supadata-api-key
+
+            - Sid: DecryptParameter
+              Effect: Allow
+              Action:
+                - kms:Decrypt
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+
+Outputs:
+  VideoSummaryFunctionUrl:
+    Description: URL pública da função Lambda
+    Value:
+      Fn::GetAtt:
+        - VideoSummaryFunctionUrl
+        - FunctionUrl
+
+  VideoSummaryFunctionName:
+    Description: Nome da função Lambda
+    Value:
+      Ref: VideoSummaryFunction

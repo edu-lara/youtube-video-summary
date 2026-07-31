@@ -1,0 +1,20 @@
+# AWS SAM
+.aws-sam/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+*.log
