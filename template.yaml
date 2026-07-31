@@ -12,7 +12,6 @@ Globals:
       - arm64
     MemorySize: 512
     Timeout: 120
-    Tracing: Active
     Environment:
       Variables:
         BEDROCK_MODEL_ID: amazon.nova-micro-v1:0
