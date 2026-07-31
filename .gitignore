@@ -32,3 +32,5 @@ venv/
 .env
 .env.*
 !.env.example
+
+template.yaml.backup
