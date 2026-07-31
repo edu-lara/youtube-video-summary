@@ -92,10 +92,10 @@ function App() {
 
       if (!response.ok) {
         const errorMessages = {
-          validation_error: t.invalidUrl,
-          transcript_error: t.transcriptError,
-          summary_error: t.summaryError,
-          internal_error: t.genericError,
+          validation_error: text.invalidUrl,
+          transcript_error: text.transcriptError,
+          summary_error: text.summaryError,
+          internal_error: text.genericError,
         };
 
         throw new Error(
