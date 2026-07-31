@@ -16,6 +16,9 @@ const translations = {
     loadingButton: 'Generating...',
     loadingMessage: 'Extracting the transcript and generating the summary...',
     emptyUrl: 'Enter a YouTube video URL.',
+    invalidUrl: 'Enter a valid YouTube URL.',
+    transcriptError: 'The transcript could not be retrieved. Make sure the video has public captions.',
+    summaryError: 'The video summary could not be generated.',
     genericError: 'Unable to generate the video summary.',
     unexpectedError: 'An unexpected error occurred.',
     resultTitle: 'Video summary',
@@ -35,6 +38,9 @@ const translations = {
     loadingButton: 'Gerando...',
     loadingMessage: 'Extraindo a legenda e gerando o resumo...',
     emptyUrl: 'Informe a URL de um vídeo do YouTube.',
+    invalidUrl: 'Informe uma URL válida do YouTube.',
+    transcriptError: 'Não foi possível obter a legenda. Confirme se o vídeo possui legendas públicas.',
+    summaryError: 'Não foi possível gerar o resumo do vídeo.',
     genericError: 'Não foi possível gerar o resumo do vídeo.',
     unexpectedError: 'Ocorreu um erro inesperado.',
     resultTitle: 'Resumo do vídeo',
@@ -85,7 +91,16 @@ function App() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || text.genericError)
+        const errorMessages = {
+          validation_error: t.invalidUrl,
+          transcript_error: t.transcriptError,
+          summary_error: t.summaryError,
+          internal_error: t.genericError,
+        };
+
+        throw new Error(
+          errorMessages[data.error] || t.genericError
+        );
       }
 
       setSummary(data.summary || data.resumo || '')
