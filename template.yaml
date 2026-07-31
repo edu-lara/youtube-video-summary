@@ -2,8 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 
 Description: >
-  Versão mínima de uma aplicação que recebe uma URL do YouTube,
-  obtém a legenda e gera um resumo com Amazon Bedrock.
+  Versao minima de uma aplicacao que recebe uma URL do YouTube,
+  obtem a legenda e gera um resumo com Amazon Bedrock.
 
 Globals:
   Function:
@@ -22,10 +22,9 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: youtube-video-summary
-      Description: Obtém a legenda de um vídeo e gera um resumo.
+      Description: Obtem a legenda de um video e gera um resumo.
       CodeUri: backend/
       Handler: app.lambda_handler
-
       FunctionUrlConfig:
         AuthType: NONE
         InvokeMode: BUFFERED
@@ -37,7 +36,6 @@ Resources:
           AllowHeaders:
             - content-type
           MaxAge: 600
-
       Policies:
         - Statement:
             - Sid: InvokeNovaMicro
@@ -56,13 +54,12 @@ Resources:
 
 Outputs:
   VideoSummaryFunctionUrl:
-    Description: URL pública da função Lambda
+    Description: Public Lambda Function URL
     Value:
       Fn::GetAtt:
         - VideoSummaryFunctionUrl
         - FunctionUrl
-
   VideoSummaryFunctionName:
-    Description: Nome da função Lambda
+    Description: Nome da funcao Lambda
     Value:
       Ref: VideoSummaryFunction
