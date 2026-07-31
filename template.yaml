@@ -54,15 +54,6 @@ Resources:
               Resource:
                 - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/youtube-summary/supadata-api-key
 
-            - Sid: DecryptParameter
-              Effect: Allow
-              Action:
-                - kms:Decrypt
-              Resource: "*"
-              Condition:
-                StringEquals:
-                  kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
-
 Outputs:
   VideoSummaryFunctionUrl:
     Description: URL pública da função Lambda
