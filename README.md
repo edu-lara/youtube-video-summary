@@ -1,24 +1,26 @@
-# YouTube Video Summary
+# Weekend Annoying Task Challenge: YouTube Video Summary
 
 🌐 **Language:** **English** \| [Português](README.pt-BR.md)
 
 ![YouTube Video Summary](images/01.youtube-video-summary-home.png)
 
-![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![Amazon
-Bedrock](https://img.shields.io/badge/Amazon-Bedrock-blue)
+![AWS](https://img.shields.io/badge/AWS-Serverless-orange)
+![Amazon Bedrock](https://img.shields.io/badge/Amazon-Bedrock-blue)
+![Amazon Nova](https://img.shields.io/badge/Amazon%20Nova-Micro-232F3E)
+![AWS Lambda](https://img.shields.io/badge/AWS%20Lambda-Function%20URL-orange)
+![AWS Amplify](https://img.shields.io/badge/AWS%20Amplify-Hosting-orange)
+![React](https://img.shields.io/badge/React-19-61DAFB)
 ![Python](https://img.shields.io/badge/Python-3.13-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-
-
 
 | Property | Value |
 |---|---|
 | AWS Region | `us-east-1` |
 | AI Model | Amazon Nova Micro |
 | Runtime | Python 3.13 |
-| Frontend | React / Vite |
+| Frontend | React 19 / Vite 8 |
 | Backend | AWS Lambda |
-| API | Amazon API Gateway HTTP API |
+| API | AWS Lambda Function URL |
 | Infrastructure as Code | AWS SAM / AWS CloudFormation |
 | Transcript Provider | Supadata |
 | Secret Storage | AWS Systems Manager Parameter Store |
@@ -28,740 +30,232 @@ AI-powered serverless application built for the **AWS Weekend Challenge: Turn On
 
 YouTube Video Summary accepts a YouTube URL, retrieves the available transcript, identifies its original language, and uses Amazon Bedrock to generate a clear, structured summary in that same language.
 
-The interface is available in English and Portuguese. English is selected by default.
-
----
-
-# Live Application
-
-The frontend can be published using AWS Amplify Hosting.
-
-```text
-https://YOUR_AMPLIFY_DOMAIN
-```
+The interface is available in English and Brazilian Portuguese. English is selected by default.
 
 > [!NOTE]
-> To keep costs controlled, the live application may be unavailable after the challenge. The complete source code remains available in this repository.
+> The production environment is temporary and will be removed after the challenge publication to avoid unnecessary AWS costs.
 
 ---
 
-# Application
+## Vision & What the App Does
 
-## YouTube URL input
+Watching a long YouTube video before knowing whether it is useful can waste valuable time.
 
-The user pastes the URL of a YouTube video into the application.
+The idea for **YouTube Video Summary** came from movie trailers. A trailer helps someone decide whether a two-hour movie is worth watching. I wanted the same decision shortcut for YouTube videos.
 
-The backend validates that:
+Instead of immediately spending 30 minutes or more watching a video, the user can first read a structured summary and decide whether the full content is relevant.
 
-- The value is a valid HTTP or HTTPS URL.
-- The domain is `youtube.com`, one of its subdomains, or `youtu.be`.
-- The request body contains a JSON object with the `url` property.
+The user pastes a public YouTube URL. The application retrieves the available transcript, identifies its language, and generates a summary in that same language.
 
-Example:
+The application provides:
 
-```json
-{
-  "url": "https://www.youtube.com/watch?v=VIDEO_ID"
-}
-```
-
----
-
-## Transcript extraction
-
-AWS Lambda requests the video transcript from Supadata.
-
-The integration supports:
-
-- Immediately available transcripts.
-- Asynchronous transcript jobs.
-- Polling until processing is complete.
-- Transcript language identification.
-- Validation when no public transcript is available.
-
-The Supadata API key is never exposed in the frontend. It is stored as a `SecureString` parameter in AWS Systems Manager Parameter Store.
+- a concise summary;
+- the main points;
+- a conclusion;
+- the detected transcript language;
+- the transcript character count;
+- access to the complete transcript;
+- an interface in English and Brazilian Portuguese.
 
 ---
 
-## AI-generated summary
+## How I Built It
 
-Amazon Bedrock uses Amazon Nova Micro to generate a structured summary containing:
+I started by defining the smallest architecture that could satisfy the challenge without adding unnecessary infrastructure.
 
-- A general overview.
-- The main points.
-- A conclusion.
+The frontend was built with **React 19** and **Vite 8**. It is hosted with **AWS Amplify Hosting** and communicates with the backend through an **AWS Lambda Function URL**.
 
-The model is instructed to:
+The backend was developed in **Python 3.13** and deployed with **AWS SAM**. The Lambda function:
 
-- Use only information contained in the transcript.
-- Avoid inventing facts, names, numbers, or conclusions.
-- Remove repetitions and filler content.
-- Preserve technical terms, product names, personal names, and acronyms.
-- Write the complete summary in the original language of the video.
-- Keep section headings in the same language as the transcript.
+1. validates the HTTP request;
+2. validates the YouTube URL;
+3. retrieves the Supadata API key from AWS Systems Manager Parameter Store;
+4. requests the public transcript from Supadata;
+5. identifies the transcript language;
+6. invokes Amazon Nova Micro through Amazon Bedrock;
+7. returns the structured summary and transcript to the frontend.
 
----
+### Key decisions
 
-## Bilingual interface
+I chose a serverless architecture to reduce cost, simplify deployment, and make the environment easy to remove after the challenge.
 
-The React frontend includes an interface language selector:
+The project does not use:
 
-- English
-- Portuguese
+- Amazon EC2;
+- containers;
+- Elastic Load Balancing;
+- Amazon API Gateway;
+- a database;
+- persistent transcript storage;
+- provisioned concurrency;
+- active AWS X-Ray tracing.
 
-English is the default interface language.
+Amazon Nova Micro was selected because it is appropriate for text summarization and supports a lower-cost architecture.
 
-The selected interface language changes only the page labels and messages. It does not control the summary language. The summary automatically follows the predominant language of the video transcript.
+The Supadata API key is stored as a `SecureString` in AWS Systems Manager Parameter Store instead of being placed in the frontend or committed to GitHub.
 
----
+The Lambda execution role follows least-privilege principles. It can invoke only the selected Amazon Nova Micro model and retrieve only the required Parameter Store value.
 
-# Architecture
+### Challenges and how I solved them
+
+#### Retrieving YouTube captions
+
+The first challenge was obtaining public captions reliably from a cloud-hosted backend. Direct transcript approaches can be blocked or restricted, while the official YouTube captions workflow is designed around authorized access.
+
+I solved this by integrating Supadata as the transcript provider.
+
+#### Returning summaries in the correct language
+
+The model did not always preserve the transcript language consistently.
+
+I updated the backend prompt to define:
+
+- the mandatory output language;
+- mandatory headings;
+- exact formatting rules;
+- low inference temperature;
+- structured output requirements.
+
+English transcripts now use:
 
 ```text
-Browser
-   │
-   ▼
-AWS Amplify Hosting
-React / Vite frontend
-   │
-   ▼
-Amazon API Gateway
-HTTP API
-   │
-   ▼
-AWS Lambda
-   │
-   ├── AWS Systems Manager Parameter Store
-   │      └── Supadata API key
-   │
-   ├── Supadata API
-   │      └── YouTube transcript and language
-   │
-   └── Amazon Bedrock
-          └── Amazon Nova Micro summary
+## Summary
+## Key points
+## Conclusion
 ```
 
-Amazon CloudWatch stores Lambda execution logs for monitoring and troubleshooting.
-
-AWS Identity and Access Management controls the permissions required by the deployment identity and the Lambda execution role.
-
-| Layer | Service |
-|---|---|
-| Frontend | AWS Amplify Hosting |
-| API | Amazon API Gateway HTTP API |
-| Backend | AWS Lambda |
-| Generative AI | Amazon Bedrock |
-| AI Model | Amazon Nova Micro |
-| Secret Storage | AWS Systems Manager Parameter Store |
-| Monitoring | Amazon CloudWatch |
-| Security | AWS IAM |
-| External Transcript Service | Supadata |
-
----
-
-# AWS Services
-
-## AWS Amplify Hosting
-
-Hosts the React application generated by Vite.
-
-The frontend can be connected to a GitHub branch so that new commits automatically trigger a new build and deployment.
-
-## Amazon API Gateway
-
-Provides the public HTTP endpoint used by the frontend.
-
-Responsibilities include:
-
-- Routing `POST` requests to AWS Lambda.
-- Handling CORS according to the SAM template.
-- Returning the Lambda response to the browser.
-- Applying optional request throttling.
-
-## AWS Lambda
-
-Implements the backend workflow.
-
-Responsibilities include:
-
-- Parsing the API Gateway event.
-- Validating the request method and body.
-- Validating the YouTube URL.
-- Retrieving the Supadata API key.
-- Requesting and polling for the transcript.
-- Enforcing the transcript size limit.
-- Invoking Amazon Bedrock.
-- Returning the summary, transcript language, transcript size, and transcript.
-
-## Amazon Bedrock
-
-Uses Amazon Nova Micro through the Converse API to create the summary.
-
-Default model ID:
+Portuguese transcripts use:
 
 ```text
-amazon.nova-micro-v1:0
+## Resumo
+## Principais pontos
+## Conclusão
 ```
 
-## AWS Systems Manager Parameter Store
+#### Connecting Amplify to the backend
 
-Stores the Supadata API key as an encrypted `SecureString`.
-
-Default parameter name:
+The frontend reads the Lambda Function URL from the Amplify environment variable:
 
 ```text
-/youtube-summary/supadata-api-key
+VITE_API_URL
 ```
 
-## Amazon CloudWatch
+CORS on the Lambda Function URL is restricted to the production Amplify domain.
 
-Stores Lambda execution logs for troubleshooting.
+#### Controlling request size and model usage
 
-The application avoids intentionally logging the transcript or the Supadata API key.
-
-## AWS IAM
-
-Provides the permissions required for:
-
-- Lambda execution.
-- Amazon CloudWatch Logs.
-- Reading the encrypted Parameter Store value.
-- Invoking the selected Amazon Bedrock model.
-- Deploying the SAM application.
-
----
-
-# External Service
-
-## Supadata
-
-Supadata retrieves the transcript and detected language for the supplied YouTube URL.
-
-The API key is sent only by the Lambda function through the `x-api-key` request header.
-
-The key must never be stored in:
-
-- `App.jsx`
-- Browser JavaScript
-- Public environment files
-- GitHub commits
-- Screenshots
-- CloudWatch logs
-
----
-
-# AWS Configuration
-
-## Lambda environment variables
-
-The backend supports these environment variables:
-
-```text
-BEDROCK_MODEL_ID=amazon.nova-micro-v1:0
-SUPADATA_PARAMETER_NAME=/youtube-summary/supadata-api-key
-```
-
-If they are not defined, the Lambda code uses the values above as defaults.
-
----
-
-## Transcript limit
-
-The minimum version limits the transcript to:
+The MVP limits transcripts to:
 
 ```text
 80,000 characters
 ```
 
-Videos with longer transcripts return a validation error.
+The Amazon Bedrock response is limited to 1,500 output tokens, and the model temperature is set to `0.1` for more consistent results.
 
 ---
 
-## API response
+## AWS Services Used / Architecture Overview
 
-A successful request returns a response similar to:
+### AWS services
 
-```json
-{
-  "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-  "transcriptLanguage": "en",
-  "transcriptCharacters": 18450,
-  "summary": "Generated summary...",
-  "transcript": "Complete transcript..."
-}
-```
-
----
-
-# Repository Structure
-
-```text
-youtube-video-summary/
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── index.html
-│   ├── package.json
-│   ├── package-lock.json
-│   └── vite.config.js
-├── images/
-│   └── youtube-video-summary.jpg
-├── template.yaml
-├── samconfig.toml
-├── README.md
-└── .gitignore
-```
-
-The Lambda source directory is the directory referenced by `CodeUri` in `template.yaml`. It contains the backend `app.py` file and its Python dependencies.
-
----
-
-# Prerequisites
-
-Before deploying the project, make sure you have:
-
-- An AWS account.
-- AWS CLI version 2.
-- AWS SAM CLI.
-- Git.
-- Node.js and npm.
-- Python 3.13.
-- Access to Amazon Bedrock in `us-east-1`.
-- Access to Amazon Nova Micro.
-- A Supadata account and API key.
-
-> [!IMPORTANT]
-> This project was developed and tested in US East (N. Virginia), `us-east-1`.
-
----
-
-# Quick Deployment
-
-## 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/youtube-video-summary.git
-cd youtube-video-summary
-```
-
-Replace `YOUR_USERNAME` with the GitHub account or organization that owns the repository.
-
----
-
-## 2. Configure AWS credentials
-
-Confirm the active identity:
-
-```bash
-aws sts get-caller-identity
-```
-
-Confirm the region:
-
-```bash
-aws configure get region
-```
-
-The expected region is:
-
-```text
-us-east-1
-```
-
----
-
-## 3. Store the Supadata API key
-
-Create the encrypted Parameter Store value:
-
-```bash
-aws ssm put-parameter \
-  --name "/youtube-summary/supadata-api-key" \
-  --description "Supadata API key for YouTube Video Summary" \
-  --type "SecureString" \
-  --value "YOUR_SUPADATA_API_KEY" \
-  --overwrite \
-  --region us-east-1
-```
-
-Do not commit the API key to the repository.
-
----
-
-## 4. Build the backend
-
-Run this command from the repository root:
-
-```bash
-sam build
-```
-
----
-
-## 5. Deploy the backend
-
-For the first deployment:
-
-```bash
-sam deploy --guided
-```
-
-Suggested values:
-
-```text
-Stack name: youtube-video-summary
-AWS Region: us-east-1
-Confirm changes before deploy: Yes
-Allow SAM CLI IAM role creation: Yes
-Save arguments to configuration file: Yes
-SAM configuration file: samconfig.toml
-SAM configuration environment: default
-```
-
-Future deployments can use:
-
-```bash
-sam build
-sam deploy
-```
-
----
-
-## 6. Get the API endpoint
-
-List the stack outputs:
-
-```bash
-sam list stack-outputs \
-  --stack-name youtube-video-summary \
-  --region us-east-1 \
-  --output table
-```
-
-Copy the API Gateway URL returned by the stack.
-
----
-
-## 7. Configure the frontend
-
-Open:
-
-```text
-frontend/src/App.jsx
-```
-
-Update:
-
-```jsx
-const API_URL = 'COLE_AQUI_O_ENDPOINT_DA_API'
-```
-
-Example:
-
-```jsx
-const API_URL =
-  'https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/YOUR_ROUTE'
-```
-
----
-
-## 8. Install the frontend dependencies
-
-```bash
-cd frontend
-npm install
-```
-
----
-
-## 9. Run the frontend locally
-
-```bash
-npm run dev
-```
-
-Vite will display a local address similar to:
-
-```text
-http://localhost:5173/
-```
-
-Open it in the browser and submit a YouTube video URL.
-
----
-
-# Deploy the Frontend with AWS Amplify
-
-## 1. Push the project to GitHub
-
-```bash
-git add .
-git commit -m "Add YouTube Video Summary application"
-git push origin main
-```
-
-## 2. Create an Amplify application
-
-In the AWS Amplify console:
-
-```text
-Create new app
-→ Host web app
-→ GitHub
-```
-
-Select the repository and branch.
-
-## 3. Configure the application root
-
-Use:
-
-```text
-frontend
-```
-
-## 4. Configure the build
-
-The frontend uses:
-
-```text
-Build command: npm run build
-Output directory: dist
-```
-
-A compatible `amplify.yml` is:
-
-```yaml
-version: 1
-applications:
-  - appRoot: frontend
-    frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: dist
-        files:
-          - "**/*"
-      cache:
-        paths:
-          - node_modules/**/*
-```
-
-## 5. Deploy
-
-Save the build settings and start the deployment.
-
-After deployment, update the API Gateway CORS configuration if the SAM template restricts allowed origins to a specific domain.
-
----
-
-# Local Backend Testing
-
-You can start the API locally with AWS SAM:
-
-```bash
-sam build
-sam local start-api
-```
-
-This requires Docker because SAM runs the Lambda function inside a local container.
-
-The locally executed Lambda still needs permission and network access to:
-
-- Read the Parameter Store value.
-- Call Supadata.
-- Invoke Amazon Bedrock.
-
----
-
-# Updating the Application
-
-## Backend update
-
-After changing the Lambda code or `template.yaml`:
-
-```bash
-sam build
-sam deploy
-```
-
-## Frontend update
-
-During local development:
-
-```bash
-cd frontend
-npm run dev
-```
-
-When the frontend is connected to AWS Amplify Hosting, commit and push the changes:
-
-```bash
-git add .
-git commit -m "Update frontend"
-git push origin main
-```
-
-Amplify will start a new deployment.
-
----
-
-# Error Responses
-
-## Invalid request
-
-```json
-{
-  "error": "validation_error",
-  "message": "Enter the video URL."
-}
-```
-
-HTTP status:
-
-```text
-400
-```
-
-## Transcript unavailable
-
-```json
-{
-  "error": "transcript_error",
-  "message": "The API did not find a public transcript for this video."
-}
-```
-
-HTTP status:
-
-```text
-422
-```
-
-## Summary generation failure
-
-```json
-{
-  "error": "summary_error",
-  "message": "Unable to generate the summary in Amazon Bedrock."
-}
-```
-
-HTTP status:
-
-```text
-502
-```
-
----
-
-# Cost and Abuse Controls
-
-The project was designed to keep operating costs controlled and reduce abusive use.
-
-Implemented controls include:
-
-- Serverless AWS architecture.
-- Amazon API Gateway HTTP API.
-- Request validation.
-- YouTube domain validation.
-- Maximum transcript size of 80,000 characters.
-- Bounded transcript polling.
-- Low model temperature.
-- Limited Amazon Bedrock output tokens.
-- Supadata API key stored outside the code.
-- No database.
-- No persistent transcript storage.
-- No reserved Lambda concurrency.
-- Least-privilege IAM permissions.
-- Optional API Gateway throttling.
-- Optional restricted CORS origin.
-
-> [!WARNING]
-> A public API without authentication can still be abused. For a production workload, add authentication, rate limits, alarms, budgets, and additional protection before making the endpoint broadly available.
-
----
-
-# Security Notes
-
-The following values are public endpoints and are not AWS credentials:
-
-- AWS Amplify URL.
-- Amazon API Gateway URL.
-
-Never commit:
-
-- AWS access keys.
-- AWS secret access keys.
-- AWS session tokens.
-- IAM credentials.
-- Supadata API keys.
-- `.env` files containing secrets.
-- Private certificates.
-- Billing information.
-- Sensitive CloudWatch logs.
-- Unencrypted configuration files containing secrets.
-
-The Supadata API key must remain in AWS Systems Manager Parameter Store.
-
----
-
-# Known Limitations
-
-- The video must have a transcript that Supadata can retrieve.
-- Private, unavailable, or unsupported videos cannot be summarized.
-- Transcripts longer than 80,000 characters are rejected by the minimum version.
-- The result depends on the completeness and quality of the transcript.
-- The frontend currently accepts one video at a time.
-- The application does not persist summaries.
-- The application does not include user authentication.
-- Supadata is an external dependency with its own availability, limits, and pricing.
-
----
-
-# Resource Names
-
-| Resource | Suggested Name |
+| AWS Service | Purpose |
 |---|---|
-| GitHub repository | `youtube-video-summary` |
-| CloudFormation stack | `youtube-video-summary` |
-| AWS Amplify application | `youtube-video-summary` |
-| SSM parameter | `/youtube-summary/supadata-api-key` |
-| Bedrock model ID | `amazon.nova-micro-v1:0` |
-| Frontend directory | `frontend` |
-| Project image | `images/youtube-video-summary.jpg` |
-| GitHub release tag | `v1.0.0` |
-| GitHub release title | `YouTube Video Summary v1.0` |
+| AWS Amplify Hosting | Hosts and deploys the React and Vite frontend |
+| AWS Lambda | Processes the request, retrieves the transcript, invokes Amazon Bedrock, and returns the result |
+| AWS Lambda Function URL | Provides the HTTPS endpoint used by the frontend |
+| Amazon Bedrock | Provides generative AI inference through the Converse API |
+| Amazon Nova Micro | Generates the structured video summary |
+| AWS Systems Manager Parameter Store | Stores the Supadata API key as a `SecureString` |
+| Amazon CloudWatch Logs | Stores Lambda execution logs |
+| AWS Identity and Access Management | Provides least-privilege permissions for the Lambda execution role |
+| AWS CloudFormation and AWS SAM | Define and deploy the backend infrastructure |
 
-The Lambda function, execution role, API Gateway, and CloudWatch log group may receive generated physical names from AWS CloudFormation.
+### External service
+
+| Service | Purpose |
+|---|---|
+| Supadata | Retrieves the public YouTube transcript and identifies its language |
+
+### How the application is triggered
+
+The application is triggered when the user:
+
+1. opens the React application hosted on AWS Amplify;
+2. enters a YouTube URL;
+3. selects **Summarize**.
+
+The browser sends an HTTPS `POST` request to the Lambda Function URL. This request invokes the AWS Lambda function.
+
+The Lambda function retrieves the transcript through Supadata, sends it to Amazon Nova Micro through Amazon Bedrock, and returns the generated summary to the frontend.
+
+### Architecture flow
+
+```text
+User
+  |
+  v
+React + Vite web application
+  |
+  v
+AWS Amplify Hosting
+  |
+  | HTTPS POST
+  v
+AWS Lambda Function URL
+  |
+  v
+AWS Lambda
+  |
+  +--> AWS Systems Manager Parameter Store
+  |       Supadata API key
+  |
+  +--> Supadata
+  |       YouTube transcript and language
+  |
+  +--> Amazon Bedrock
+          Amazon Nova Micro summary
+
+AWS Lambda
+  |
+  v
+Amazon CloudWatch Logs
+```
+
+### Architecture diagram
+
+![YouTube Video Summary AWS Architecture](images/08.aws-architecture.png)
 
 ---
 
-# Project Highlights
+## What I Learned
 
-- AI-powered YouTube video summarization.
-- Summary generated in the original language of the video.
-- English and Portuguese interface.
-- React and Vite frontend.
-- Serverless AWS backend.
-- Amazon Bedrock integration using Amazon Nova Micro.
-- Secure Supadata API key storage.
-- Infrastructure as Code with AWS SAM.
-- Cost-aware architecture.
-- No database or persistent transcript storage.
-- Clear local and cloud deployment workflow.
-- Built as a reproducible AWS Builder challenge project.
+This challenge reinforced the importance of starting with the minimum architecture required to solve the problem.
+
+I learned how to:
+
+- deploy a Python backend with AWS SAM;
+- expose a Lambda function through a Lambda Function URL;
+- connect an AWS Amplify frontend to a serverless backend;
+- configure production CORS correctly;
+- store an external API key securely in Parameter Store;
+- apply least-privilege IAM permissions;
+- invoke Amazon Nova Micro through the Amazon Bedrock Converse API;
+- control model output using language rules, fixed headings, token limits, and low temperature;
+- design an application that does not require a database;
+- balance simplicity, security, cost, and usability in a weekend project.
+
+I also learned that the smallest working architecture is not always the first architecture considered. Several services and features were intentionally removed because they were not required for the MVP.
+
+The final result is a focused serverless application that solves one repetitive task: deciding whether a YouTube video is worth watching before investing the time to watch it.
 
 ---
 
-# License
+## Link to Repo
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+[edu-lara/youtube-video-summary](https://github.com/edu-lara/youtube-video-summary)
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
