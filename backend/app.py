@@ -280,46 +280,75 @@ def get_transcript(video_url: str) -> tuple[str, str]:
 
 
 def generate_summary(transcript: str, transcript_language: str) -> str:
+    language_code = transcript_language.lower().strip()
+
+    if language_code.startswith("pt"):
+        output_language = "Brazilian Portuguese"
+        summary_heading = "Resumo"
+        key_points_heading = "Principais pontos"
+        conclusion_heading = "Conclusão"
+    elif language_code.startswith("en"):
+        output_language = "English"
+        summary_heading = "Summary"
+        key_points_heading = "Key points"
+        conclusion_heading = "Conclusion"
+    else:
+        output_language = (
+            "the predominant language used in the transcript"
+        )
+        summary_heading = "Summary translated into the transcript language"
+        key_points_heading = (
+            "Key points translated into the transcript language"
+        )
+        conclusion_heading = (
+            "Conclusion translated into the transcript language"
+        )
+
     prompt = f"""
-Analyze the transcript below and create a clear and structured summary.
+Create a clear and structured summary of the content below.
 
-The language identified by the transcript service is: {transcript_language}
+Mandatory output language:
+{output_language}
 
-Language rules:
-1. Write the entire summary in the same language as the transcript.
-2. Do not translate the summary into Portuguese, English, or any other language.
-3. If the language identifier is unclear, detect the predominant language directly from the transcript.
-4. Keep section headings in the same language as the transcript.
-5. Do not mention the detected language in the answer.
+Mandatory headings:
+## {summary_heading}
+## {key_points_heading}
+## {conclusion_heading}
 
-Content rules:
-1. Use only information contained in the transcript.
-2. Do not invent facts, names, numbers, or conclusions.
+Language requirements:
+1. Write every sentence in {output_language}.
+2. Use exactly the mandatory headings shown above.
+3. Do not mix languages.
+4. Do not translate proper nouns, official product names, service names,
+   personal names, technical terms, or acronyms.
+5. Do not mention the language or the transcript in the answer.
+
+Content requirements:
+1. Use only information contained in the supplied content.
+2. Do not invent facts, names, numbers, examples, or conclusions.
 3. Remove repetitions, filler words, and irrelevant passages.
-4. Preserve product names, service names, personal names, technical concepts, and acronyms.
+4. Preserve the original meaning.
 5. Explain the topics clearly.
-6. Do not say that you received or analyzed a transcript.
-7. Do not translate proper nouns or official product names.
 
-Use this structure, translating the headings into the transcript language:
+Required structure:
 
-## Summary
+## {summary_heading}
 
 Write two to four paragraphs describing the overall content.
 
-## Key points
+## {key_points_heading}
 
-Present between five and ten items.
+Present between five and ten bullet points.
 
-## Conclusion
+## {conclusion_heading}
 
-Present the main conclusion or final message of the video.
+Present the main conclusion or final message.
 
-Transcript:
+Content:
 
-<transcript>
+<content>
 {transcript}
-</transcript>
+</content>
 """.strip()
 
     try:
@@ -328,10 +357,10 @@ Transcript:
             system=[
                 {
                     "text": (
-                        "You are an assistant specialized in accurately "
-                        "summarizing educational content. Always answer in "
-                        "the predominant language of the supplied content. "
-                        "Never translate the summary into another language."
+                        f"You summarize educational content accurately. "
+                        f"You must answer only in {output_language}. "
+                        f"Do not mix languages. "
+                        f"Follow the requested headings exactly."
                     )
                 }
             ],
@@ -343,7 +372,7 @@ Transcript:
             ],
             inferenceConfig={
                 "maxTokens": 1_500,
-                "temperature": 0.2,
+                "temperature": 0.1,
                 "topP": 0.9,
             },
         )
