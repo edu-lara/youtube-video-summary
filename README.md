@@ -47,6 +47,8 @@ Instead of immediately spending 30 minutes or more watching a video, the user ca
 
 The user pastes a public YouTube URL. The application retrieves the available transcript, identifies its language, and generates a summary in that same language.
 
+![YouTube Video Summary application home](images/03.application-home.png)
+
 The application provides:
 
 - a concise summary;
@@ -57,6 +59,8 @@ The application provides:
 - access to the complete transcript;
 - an interface in English and Brazilian Portuguese.
 
+![Generated YouTube video summary](images/04.application-summary.png)
+
 ---
 
 ## How I Built It
@@ -64,6 +68,8 @@ The application provides:
 I started by defining the smallest architecture that could satisfy the challenge without adding unnecessary infrastructure.
 
 The frontend was built with **React 19** and **Vite 8**. It is hosted with **AWS Amplify Hosting** and communicates with the backend through an **AWS Lambda Function URL**.
+
+![AWS Amplify production deployment](images/02.amplify-deployment.png)
 
 The backend was developed in **Python 3.13** and deployed with **AWS SAM**. The Lambda function:
 
@@ -93,6 +99,8 @@ The project does not use:
 Amazon Nova Micro was selected because it is appropriate for text summarization and supports a lower-cost architecture.
 
 The Supadata API key is stored as a `SecureString` in AWS Systems Manager Parameter Store instead of being placed in the frontend or committed to GitHub.
+
+![AWS Lambda environment variables](images/06.lambda-environment-variables.png)
 
 The Lambda execution role follows least-privilege principles. It can invoke only the selected Amazon Nova Micro model and retrieve only the required Parameter Store value.
 
@@ -140,7 +148,11 @@ The frontend reads the Lambda Function URL from the Amplify environment variable
 VITE_API_URL
 ```
 
+![AWS Amplify environment variables](images/07.amplify-environment-variables.png)
+
 CORS on the Lambda Function URL is restricted to the production Amplify domain.
+
+![AWS Lambda Function URL CORS configuration](images/05.lambda-cors.png)
 
 #### Controlling request size and model usage
 
