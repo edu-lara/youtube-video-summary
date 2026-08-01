@@ -56,7 +56,6 @@ The application provides:
 - a conclusion;
 - the detected transcript language;
 - the transcript character count;
-- access to the complete transcript;
 - an interface in English and Brazilian Portuguese.
 
 ![Generated YouTube video summary](images/04.application-summary.png)
@@ -178,7 +177,6 @@ The Amazon Bedrock response is limited to 1,500 output tokens, and the model tem
 | Amazon Bedrock | Provides generative AI inference through the Converse API |
 | Amazon Nova Micro | Generates the structured video summary |
 | AWS Systems Manager Parameter Store | Stores the Supadata API key as a `SecureString` |
-| Amazon CloudWatch Logs | Stores Lambda execution logs |
 | AWS Identity and Access Management | Provides least-privilege permissions for the Lambda execution role |
 | AWS CloudFormation and AWS SAM | Define and deploy the backend infrastructure |
 
@@ -227,15 +225,522 @@ AWS Lambda
   +--> Amazon Bedrock
           Amazon Nova Micro summary
 
-AWS Lambda
-  |
-  v
-Amazon CloudWatch Logs
 ```
 
 ### Architecture diagram
 
 ![YouTube Video Summary AWS Architecture](images/08.aws-architecture.png)
+
+---
+
+## Repository Structure
+
+```text
+youtube-video-summary/
+├── backend/
+│   ├── app.py
+│   └── requirements.txt
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── package-lock.json
+│   ├── package.json
+│   └── vite.config.js
+├── images/
+├── .gitignore
+├── LICENSE
+├── README.md
+├── README.pt-BR.md
+├── samconfig.toml
+└── template.yaml
+```
+
+The backend infrastructure is defined in `template.yaml` and deployed with AWS SAM. The frontend is a separate Vite application inside the `frontend` directory.
+
+---
+
+## Deployment and Installation
+
+> [!IMPORTANT]
+> This project creates AWS resources that can generate charges. The Lambda Function URL uses `AuthType: NONE`, which makes the endpoint publicly accessible. Deploy the application only for controlled testing, restrict CORS to origins you own, and remove the environment when it is no longer required.
+
+### Prerequisites
+
+Before starting, install or prepare:
+
+- an AWS account;
+- an administrator identity that can create an IAM policy, an IAM user, and an access key;
+- [AWS CLI version 2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html);
+- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html);
+- Git;
+- Python 3.13;
+- Node.js `20.19+` or `22.12+`, with npm;
+- a GitHub account and permission to access the repository or your fork;
+- a Supadata account and API key;
+- permission to invoke Amazon Nova Micro in `us-east-1`.
+
+The included `samconfig.toml` configures the CloudFormation stack as `youtube-video-summary` in `us-east-1` and enables automatic resolution of the deployment S3 bucket.
+
+### 1. Create a dedicated IAM user for the project
+
+Use an administrator identity to create a dedicated IAM user named:
+
+```text
+youtube-video-summary
+```
+
+This user is intended only for programmatic deployment and cleanup commands for this project. Do not create access keys for the AWS account root user.
+
+> [!NOTE]
+> Keep the access key private, never commit it to GitHub, and delete the key and user after removing the project.
+
+#### Create the customer managed policy
+
+1. Open the AWS Identity and Access Management console.
+2. Copy your 12-digit AWS account ID from the account menu.
+3. Open **Policies** and select **Create policy**.
+4. Select the **JSON** editor.
+5. Paste the policy below.
+6. Replace every occurrence of `YOUR_AWS_ACCOUNT_ID` with your 12-digit AWS account ID, without hyphens.
+7. Create the policy with the name `YouTubeSummarySamIamDeployment`.
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ManageProjectLambdaRole",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:UpdateAssumeRolePolicy",
+                "iam:PutRolePolicy",
+                "iam:GetRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:ListRolePolicies",
+                "iam:ListAttachedRolePolicies",
+                "iam:TagRole",
+                "iam:UntagRole"
+            ],
+            "Resource": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/youtube-video-summary-*"
+        },
+        {
+            "Sid": "AttachProjectRolePolicies",
+            "Effect": "Allow",
+            "Action": [
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy"
+            ],
+            "Resource": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/youtube-video-summary-*"
+        },
+        {
+            "Sid": "PassProjectRoleToLambda",
+            "Effect": "Allow",
+            "Action": "iam:PassRole",
+            "Resource": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/youtube-video-summary-*",
+            "Condition": {
+                "StringEquals": {
+                    "iam:PassedToService": "lambda.amazonaws.com"
+                }
+            }
+        },
+        {
+            "Sid": "ReadDeploymentPolicy",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:ListPolicyVersions"
+            ],
+            "Resource": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:policy/YouTubeSummarySamIamDeployment"
+        },
+        {
+            "Sid": "ViewOwnUserPolicies",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetUser",
+                "iam:ListAttachedUserPolicies",
+                "iam:ListUserPolicies",
+                "iam:GetUserPolicy",
+                "iam:ListGroupsForUser"
+            ],
+            "Resource": "arn:aws:iam::YOUR_AWS_ACCOUNT_ID:user/youtube-video-summary"
+        },
+        {
+            "Sid": "ReadCloudTrailDeploymentEvents",
+            "Effect": "Allow",
+            "Action": "cloudtrail:LookupEvents",
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+#### Create the IAM user and attach the policies
+
+1. In the IAM console, open **Users** and select **Create user**.
+2. Enter `youtube-video-summary` as the user name.
+3. Do not enable AWS Management Console access for this user.
+4. Under permissions, select **Attach policies directly**.
+5. Attach the AWS managed policy `PowerUserAccess`.
+6. Attach the customer managed policy `YouTubeSummarySamIamDeployment`.
+7. Create the user.
+8. Open the new user and select **Security credentials**.
+9. Under **Access keys**, select **Create access key**.
+10. Select **Command Line Interface (CLI)** as the use case.
+11. Create the key and securely save the **Access key ID** and **Secret access key**. The secret is displayed only once.
+
+`PowerUserAccess` provides broad access to AWS services and resources but does not provide the IAM permissions needed to manage the project Lambda execution role. The `YouTubeSummarySamIamDeployment` policy supplies only the additional IAM actions used by this AWS SAM deployment.
+
+### 2. Configure the project AWS CLI profile
+
+Configure a named profile with the access key created for the dedicated user:
+
+```bash
+aws configure --profile youtube-video-summary
+```
+
+Enter:
+
+```text
+AWS Access Key ID: YOUR_ACCESS_KEY_ID
+AWS Secret Access Key: YOUR_SECRET_ACCESS_KEY
+Default region name: us-east-1
+Default output format: json
+```
+
+Confirm the configured identity:
+
+```bash
+aws sts get-caller-identity --profile youtube-video-summary
+```
+
+Verify that the returned ARN contains `user/youtube-video-summary` and that the account ID is correct. The AWS CLI and AWS SAM commands in this guide explicitly use this named profile when accessing AWS.
+
+### 3. Clone the repository
+
+```bash
+git clone https://github.com/edu-lara/youtube-video-summary.git
+cd youtube-video-summary
+```
+
+To make changes under your own GitHub account, fork the repository first and clone your fork instead.
+
+### 4. Create a Supadata account and store the API key
+
+This application uses Supadata to retrieve the public YouTube transcript before sending the text to Amazon Bedrock. Create a Supadata account, copy the API key from your account, and store it in AWS Systems Manager Parameter Store:
+
+```bash
+aws ssm put-parameter \
+  --name "/youtube-summary/supadata-api-key" \
+  --value "YOUR_SUPADATA_API_KEY" \
+  --type "SecureString" \
+  --region "us-east-1" \
+  --profile youtube-video-summary
+```
+
+Replace `YOUR_SUPADATA_API_KEY` with your Supadata API key. The parameter must exist in `us-east-1`. To replace an existing value, repeat the command with `--overwrite`.
+
+Do not commit the Supadata API key to the repository or expose it through a Vite environment variable.
+
+### 5. Configure CORS for local development
+
+Before deploying your copy, open `template.yaml` and replace the existing Amplify domain under `AllowOrigins` with your local Vite origin:
+
+```yaml
+Cors:
+  AllowOrigins:
+    - "http://localhost:5173"
+  AllowMethods:
+    - POST
+  AllowHeaders:
+    - content-type
+  MaxAge: 600
+```
+
+If Vite starts on a different port, use the exact origin displayed by `npm run dev`.
+
+### 6. Validate and build the backend
+
+From the repository root, run:
+
+```bash
+sam validate --lint
+sam build
+```
+
+The lint option validates the AWS SAM template with CloudFormation Linter. The build output is created in `.aws-sam/`, which is excluded from Git.
+
+### 7. Deploy the backend
+
+Deploy the application:
+
+```bash
+sam deploy \
+  --stack-name youtube-video-summary \
+  --region us-east-1 \
+  --capabilities CAPABILITY_IAM \
+  --profile youtube-video-summary
+```
+
+Review the CloudFormation change set and confirm the deployment when prompted. AWS SAM creates or updates the `youtube-video-summary` CloudFormation stack.
+
+### 8. Retrieve the Lambda Function URL
+
+After the deployment completes, obtain the endpoint from the CloudFormation output:
+
+```bash
+FUNCTION_URL=$(aws cloudformation describe-stacks \
+  --stack-name "youtube-video-summary" \
+  --region "us-east-1" \
+  --query "Stacks[0].Outputs[?OutputKey=='VideoSummaryFunctionUrl'].OutputValue" \
+  --output text \
+  --profile youtube-video-summary)
+
+echo "$FUNCTION_URL"
+```
+
+The value should follow this format:
+
+```text
+https://<url-id>.lambda-url.us-east-1.on.aws/
+```
+
+### 9. Install and run the frontend locally
+
+Enter the frontend directory and create a local environment file:
+
+```bash
+cd frontend
+printf 'VITE_API_URL=%s\n' "$FUNCTION_URL" > .env.local
+```
+
+Install the exact dependency versions from `package-lock.json` and start Vite:
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the local address displayed by Vite, normally:
+
+```text
+http://localhost:5173
+```
+
+After testing, press `Ctrl+C` in the terminal to stop the local server.
+
+The `.env.local` file is ignored by Git and must not contain secrets. `VITE_API_URL` is a public application endpoint, not a credential.
+
+### 10. Test the deployed backend directly
+
+You can also send a request from the terminal:
+
+```bash
+curl -sS -X POST "$FUNCTION_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID"}'
+```
+
+Replace `VIDEO_ID` with a public YouTube video that has an available transcript.
+
+### 11. Deploy the frontend with AWS Amplify Hosting
+
+Push the repository or your fork to GitHub. Then sign in to the AWS Management Console with the administrator identity used to create the project IAM user:
+
+1. open the AWS Amplify console in `us-east-1`;
+2. select **Create new app**;
+3. connect GitHub and select the repository and branch;
+4. indicate that the repository is a monorepo;
+5. set the application root to `frontend`;
+6. add the environment variable `VITE_API_URL` with the Lambda Function URL;
+7. create the application;
+8. open **Hosting**, select **Build settings**, and choose **Edit**;
+9. replace the build specification with the configuration below;
+10. save the settings and start a new deployment.
+
+```yaml
+version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci --cache .npm --prefer-offline
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - .npm/**/*
+    appRoot: frontend
+```
+
+This build specification is configured directly in AWS Amplify Hosting and does not need to be stored as an `amplify.yml` file in the repository.
+
+Amplify environment variables are available during the build. Because Vite bundles `VITE_API_URL` into the frontend, start a new Amplify deployment after changing its value.
+
+### 12. Restrict CORS to your Amplify domain
+
+After Amplify provides the production domain, return to `template.yaml` and replace the local origin with your own Amplify origin:
+
+```yaml
+Cors:
+  AllowOrigins:
+    - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
+  AllowMethods:
+    - POST
+  AllowHeaders:
+    - content-type
+  MaxAge: 600
+```
+
+To keep both local and production access during development, include both exact origins:
+
+```yaml
+AllowOrigins:
+  - "http://localhost:5173"
+  - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
+```
+
+Return to the repository root and deploy the CORS update:
+
+```bash
+cd ..
+sam validate --lint
+sam build
+sam deploy \
+  --stack-name youtube-video-summary \
+  --region us-east-1 \
+  --capabilities CAPABILITY_IAM \
+  --profile youtube-video-summary
+```
+
+Do not use `*` for a public deployment. CORS restricts browser origins, but it does not authenticate callers or prevent direct requests to the public Function URL.
+
+### 13. Test the production application
+
+Open the Amplify domain and confirm that:
+
+- the page loads correctly;
+- a valid YouTube URL generates a summary;
+- the summary uses the transcript language;
+- invalid URLs display an error;
+- requests from an unauthorized browser origin are blocked by CORS.
+
+---
+
+## Updating the Application
+
+### Backend or infrastructure changes
+
+Use this workflow after changing:
+
+- `backend/app.py`;
+- `backend/requirements.txt`;
+- `template.yaml`;
+- `samconfig.toml`.
+
+From the repository root, run:
+
+```bash
+sam validate --lint
+sam build
+sam deploy \
+  --stack-name youtube-video-summary \
+  --region us-east-1 \
+  --capabilities CAPABILITY_IAM \
+  --profile youtube-video-summary
+```
+
+The deployment updates the existing `youtube-video-summary` CloudFormation stack.
+
+### Frontend changes
+
+Files such as `frontend/src/App.jsx`, `frontend/src/App.css`, and other files under `frontend/` are not deployed by AWS SAM.
+
+Test a frontend change locally:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+After confirming the change, return to the repository root, commit it, and push it to the GitHub branch connected to AWS Amplify:
+
+```bash
+cd ..
+git add frontend
+git commit -m "Update frontend"
+git push
+```
+
+AWS Amplify automatically builds and deploys the connected branch when automatic builds are enabled. You do not need to run `sam build` or `sam deploy` when only `App.jsx` or another frontend file changes.
+
+Do not commit `frontend/.env.local`. If `VITE_API_URL` changes, update it in the AWS Amplify environment variables and start a new Amplify deployment.
+
+---
+
+## Cleanup
+
+Remove the environment when it is no longer required. Keep the dedicated IAM user active until all CLI-based cleanup commands are complete.
+
+### 1. Delete the AWS SAM application
+
+From the repository root, run:
+
+```bash
+sam delete \
+  --stack-name "youtube-video-summary" \
+  --region "us-east-1" \
+  --profile youtube-video-summary
+```
+
+Confirm the deletion when prompted.
+
+AWS SAM deletes the `youtube-video-summary` CloudFormation stack and the resources managed by it, including the Lambda function, Lambda Function URL, and Lambda execution role. Do not delete the same application stack separately in the AWS CloudFormation console.
+
+### 2. Delete the AWS Amplify application
+
+In the AWS Amplify console:
+
+1. open the application;
+2. open the application settings;
+3. select **Delete app**;
+4. confirm the deletion.
+
+This removes the hosted frontend and its Amplify domain.
+
+### 3. Delete the Supadata parameter
+
+```bash
+aws ssm delete-parameter \
+  --name "/youtube-summary/supadata-api-key" \
+  --region "us-east-1" \
+  --profile youtube-video-summary
+```
+
+### 4. Delete the dedicated IAM user and policy
+
+After deleting the application resources, sign in with the administrator identity used to create the project user.
+
+In the IAM console:
+
+1. open **Users** and select `youtube-video-summary`;
+2. delete its access key;
+3. detach `PowerUserAccess` and `YouTubeSummarySamIamDeployment`;
+4. delete the `youtube-video-summary` user;
+5. open **Policies** and delete `YouTubeSummarySamIamDeployment`.
+
+> [!NOTE]
+> AWS SAM may create a shared CloudFormation stack named `aws-sam-cli-managed-default` for deployment artifacts. It is separate from the `youtube-video-summary` application stack. Keep it if other AWS SAM projects use it or if you plan to deploy with AWS SAM again. Delete it only after confirming that it is no longer required by another project.
 
 ---
 
