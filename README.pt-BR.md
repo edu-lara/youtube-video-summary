@@ -30,10 +30,7 @@ Aplicação serverless com inteligência artificial criada para o **AWS Weekend 
 
 O YouTube Video Summary recebe uma URL do YouTube, obtém a transcrição disponível, identifica seu idioma original e usa o Amazon Bedrock para gerar um resumo claro e estruturado no mesmo idioma.
 
-A interface está disponível em inglês e português do Brasil. O inglês é selecionado por padrão.
-
-> [!NOTE]
-> O ambiente de produção é temporário e será removido após a publicação do desafio para evitar custos desnecessários na AWS.
+A interface da aplicação está disponível em inglês e português do Brasil. O inglês é selecionado por padrão.
 
 ---
 
@@ -109,11 +106,11 @@ A função de execução da Lambda segue o princípio de privilégio mínimo. El
 
 O primeiro desafio foi obter legendas públicas de maneira confiável a partir de um backend hospedado na nuvem. Abordagens diretas para obter transcrições podem ser bloqueadas ou restringidas, enquanto o fluxo oficial de legendas do YouTube foi desenvolvido para acesso autorizado.
 
-Resolvi esse problema integrando a Supadata como provedora de transcrições.
+Resolvi esse problema integrando a [Supadata](https://supadata.ai/) como provedora de transcrições.
 
 #### Retorno dos resumos no idioma correto
 
-O modelo nem sempre mantinha o idioma da transcrição de maneira consistente.
+Outro desafio era que o modelo nem sempre mantinha o idioma da transcrição de maneira consistente.
 
 Atualizei o prompt do backend para definir:
 
@@ -276,7 +273,7 @@ Antes de começar, instale ou prepare:
 - Python 3.13;
 - Node.js `20.19+` ou `22.12+`, com npm;
 - uma conta no GitHub e permissão para acessar o repositório ou seu fork;
-- uma conta na Supadata e uma chave de API;
+- uma conta no [Supadata](https://supadata.ai/) e obtenha uma chave de API;
 - permissão para invocar o Amazon Nova Micro na região `us-east-1`.
 
 O arquivo `samconfig.toml` incluído configura a pilha do CloudFormation como `youtube-video-summary` na região `us-east-1` e habilita a resolução automática do bucket S3 usado na implantação.
@@ -419,18 +416,26 @@ aws sts get-caller-identity --profile youtube-video-summary
 
 Verifique se o ARN retornado contém `user/youtube-video-summary` e se o ID da conta está correto. Os comandos da AWS CLI e do AWS SAM apresentados neste guia informam explicitamente esse profile ao acessar a AWS.
 
-### 3. Clonar o repositório
+### 3. Criar um fork e clonar o repositório
+
+Crie um fork deste repositório em sua conta do GitHub. Em seguida, clone o seu fork, substituindo SEU_USUARIO pelo seu nome de usuário no GitHub:
 
 ```bash
-git clone https://github.com/edu-lara/youtube-video-summary.git
+git clone https://github.com/SEU_USUARIO/youtube-video-summary.git
 cd youtube-video-summary
 ```
 
-Para fazer alterações em sua própria conta do GitHub, primeiro crie um fork do repositório e clone o seu fork.
+Confirme que o repositório remoto aponta para o seu fork:
+
+```bash
+git remote -v
+```
+
+O endereço exibido como origin deverá conter o seu nome de usuário do GitHub.
 
 ### 4. Criar uma conta na Supadata e armazenar a chave de API
 
-Esta aplicação utiliza a Supadata para obter a transcrição pública do vídeo do YouTube antes de enviar o texto ao Amazon Bedrock. Crie uma conta na Supadata, copie a chave de API da sua conta e armazene-a no AWS Systems Manager Parameter Store:
+Esta aplicação utiliza a Supadata para obter a transcrição pública do vídeo do YouTube antes de enviar o texto ao Amazon Bedrock. Crie uma conta na [Supadata](https://supadata.ai/), copie a chave de API da sua conta e armazene-a no AWS Systems Manager Parameter Store:
 
 ```bash
 aws ssm put-parameter \
@@ -443,7 +448,8 @@ aws ssm put-parameter \
 
 Substitua `YOUR_SUPADATA_API_KEY` pela sua chave de API da Supadata. O parâmetro deve existir na região `us-east-1`. Para substituir um valor existente, repita o comando adicionando `--overwrite`.
 
-Não envie a chave de API da Supadata ao repositório e não a exponha por meio de uma variável de ambiente do Vite.
+> [!NOTE]
+> Não envie a chave de API da Supadata ao repositório e não a exponha por meio de uma variável de ambiente do Vite.
 
 ### 5. Configurar o CORS para o desenvolvimento local
 
@@ -536,7 +542,7 @@ O arquivo `.env.local` está excluído do Git e não deve conter segredos. `VITE
 
 ### 10. Testar diretamente o backend implantado
 
-Também é possível enviar uma requisição pelo terminal:
+Também é possível enviar uma requisição pelo terminal. Mas isso é opcional e para propósito de testes.
 
 ```bash
 curl -sS -X POST "$FUNCTION_URL" \
@@ -548,18 +554,28 @@ Substitua `VIDEO_ID` pelo ID de um vídeo público do YouTube que tenha uma tran
 
 ### 11. Implantar o frontend com o AWS Amplify Hosting
 
-Envie o repositório ou seu fork ao GitHub. Em seguida, acesse o Console de Gerenciamento da AWS com a identidade de administrador usada para criar o usuário IAM do projeto:
+Envie as alterações feitas localmente para o seu fork no GitHub:
+
+```bash
+git add . 
+git commit -m "Configure the application for deployment" 
+git push origin main
+```
+
+Em seguida, acesse o Console de Gerenciamento da AWS com uma identidade que tenha permissão para criar e configurar aplicações no AWS Amplify Hosting:
 
 1. abra o console do AWS Amplify na região `us-east-1`;
 2. selecione **Criar novo aplicativo**;
-3. conecte o GitHub e selecione o repositório e a branch;
-4. indique que o repositório é um monorepo;
-5. defina a raiz da aplicação como `frontend`;
-6. adicione a variável de ambiente `VITE_API_URL` com a Lambda Function URL;
-7. crie a aplicação;
-8. abra **Hospedagem**, selecione **Configurações de compilação** e escolha **Editar**;
-9. substitua a especificação de compilação pela configuração abaixo;
-10. salve as configurações e inicie uma nova implantação.
+3. escolha GitHub como provedor do repositório e selecione Avançar;
+4. autorize o AWS Amplify a acessar a sua conta do GitHub;
+5. select your fork and the main branch;
+6. indique que o repositório é um monorepo;
+7. defina a raiz da aplicação como `frontend`;
+8. adicione a variável de ambiente `VITE_API_URL` com a Lambda Function URL;
+9. crie a aplicação;
+10. abra **Hospedagem**, selecione **Configurações de compilação** e escolha **Editar**;
+11. substitua a especificação de compilação pela configuração abaixo;
+12. salve as configurações e inicie uma nova implantação.
 
 ```yaml
 version: 1
@@ -764,16 +780,6 @@ Aprendi como:
 Também aprendi que a menor arquitetura funcional nem sempre é a primeira arquitetura considerada. Vários serviços e recursos foram removidos intencionalmente porque não eram necessários para o MVP.
 
 O resultado final é uma aplicação serverless focada em resolver uma tarefa repetitiva: decidir se vale a pena assistir a um vídeo do YouTube antes de investir tempo para assisti-lo.
-
----
-
-## Demonstração
-
-Experimente a aplicação:
-
-[Abrir YouTube Video Summary](https://main.d25avzzlw30qwi.amplifyapp.com/)
-
-> **Observação:** A demonstração está disponível por tempo limitado.
 
 ---
 

@@ -30,10 +30,7 @@ AI-powered serverless application built for the **AWS Weekend Challenge: Turn On
 
 YouTube Video Summary accepts a YouTube URL, retrieves the available transcript, identifies its original language, and uses Amazon Bedrock to generate a clear, structured summary in that same language.
 
-The interface is available in English and Brazilian Portuguese. English is selected by default.
-
-> [!NOTE]
-> The production environment is temporary and will be removed after the challenge publication to avoid unnecessary AWS costs.
+The app interface is available in English and Brazilian Portuguese. English is selected by default.
 
 ---
 
@@ -109,11 +106,11 @@ The Lambda execution role follows least-privilege principles. It can invoke only
 
 The first challenge was obtaining public captions reliably from a cloud-hosted backend. Direct transcript approaches can be blocked or restricted, while the official YouTube captions workflow is designed around authorized access.
 
-I solved this by integrating Supadata as the transcript provider.
+I solved this by integrating [Supadata](https://supadata.ai/) as the transcript provider.
 
 #### Returning summaries in the correct language
 
-The model did not always preserve the transcript language consistently.
+Another challenge was the model did not always preserve the transcript language consistently.
 
 I updated the backend prompt to define:
 
@@ -276,7 +273,7 @@ Before starting, install or prepare:
 - Python 3.13;
 - Node.js `20.19+` or `22.12+`, with npm;
 - a GitHub account and permission to access the repository or your fork;
-- a Supadata account and API key;
+- a [Supadata](https://supadata.ai/) account and API key;
 - permission to invoke Amazon Nova Micro in `us-east-1`.
 
 The included `samconfig.toml` configures the CloudFormation stack as `youtube-video-summary` in `us-east-1` and enables automatic resolution of the deployment S3 bucket.
@@ -419,18 +416,25 @@ aws sts get-caller-identity --profile youtube-video-summary
 
 Verify that the returned ARN contains `user/youtube-video-summary` and that the account ID is correct. The AWS CLI and AWS SAM commands in this guide explicitly use this named profile when accessing AWS.
 
-### 3. Clone the repository
+### 3. Criar um fork e clonar o repositório
+
+Create a fork of this repository in your GitHub account. Then, clone your fork by replacing YOUR_USERNAME with your GitHub username:
 
 ```bash
-git clone https://github.com/edu-lara/youtube-video-summary.git
-cd youtube-video-summary
+git clone https://github.com/YOUR_USERNAME/youtube-video-summary.git cd youtube-video-summary
 ```
 
-To make changes under your own GitHub account, fork the repository first and clone your fork instead.
+Confirm that the remote repository points to your fork:
+
+```bash
+git remote -v
+```
+
+The URL displayed for origin should include your GitHub username.
 
 ### 4. Create a Supadata account and store the API key
 
-This application uses Supadata to retrieve the public YouTube transcript before sending the text to Amazon Bedrock. Create a Supadata account, copy the API key from your account, and store it in AWS Systems Manager Parameter Store:
+This application uses Supadata to retrieve the public YouTube transcript before sending the text to Amazon Bedrock. Create a [Supadata](https://supadata.ai/) account, copy the API key from your account, and store it in AWS Systems Manager Parameter Store:
 
 ```bash
 aws ssm put-parameter \
@@ -443,7 +447,8 @@ aws ssm put-parameter \
 
 Replace `YOUR_SUPADATA_API_KEY` with your Supadata API key. The parameter must exist in `us-east-1`. To replace an existing value, repeat the command with `--overwrite`.
 
-Do not commit the Supadata API key to the repository or expose it through a Vite environment variable.
+> [!NOTE]
+> Do not commit the Supadata API key to the repository or expose it through a Vite environment variable.
 
 ### 5. Configure CORS for local development
 
@@ -536,7 +541,7 @@ The `.env.local` file is ignored by Git and must not contain secrets. `VITE_API_
 
 ### 10. Test the deployed backend directly
 
-You can also send a request from the terminal:
+You can also send a request from the terminal. But this is optional and for testing purposes.
 
 ```bash
 curl -sS -X POST "$FUNCTION_URL" \
@@ -548,18 +553,28 @@ Replace `VIDEO_ID` with a public YouTube video that has an available transcript.
 
 ### 11. Deploy the frontend with AWS Amplify Hosting
 
-Push the repository or your fork to GitHub. Then sign in to the AWS Management Console with the administrator identity used to create the project IAM user:
+Push the changes made locally to your fork on GitHub:
+
+```bash
+git add . 
+git commit -m "Configure the application for deployment" 
+git push origin main
+```
+
+Then, sign in to the AWS Management Console using an identity with permission to create and configure applications in AWS Amplify Hosting:
 
 1. open the AWS Amplify console in `us-east-1`;
 2. select **Create new app**;
-3. connect GitHub and select the repository and branch;
-4. indicate that the repository is a monorepo;
-5. set the application root to `frontend`;
-6. add the environment variable `VITE_API_URL` with the Lambda Function URL;
-7. create the application;
-8. open **Hosting**, select **Build settings**, and choose **Edit**;
-9. replace the build specification with the configuration below;
-10. save the settings and start a new deployment.
+3. choose GitHub as the repository provider and select Next;
+4. authorize AWS Amplify to access your GitHub account;
+5. select your fork and the main branch;
+6. indicate that the repository is a monorepo;
+7. set the application root to `frontend`;
+8. add the environment variable `VITE_API_URL` with the Lambda Function URL;
+9. create the application;
+10. open **Hosting**, select **Build settings**, and choose **Edit**;
+11. replace the build specification with the configuration below;
+12. save the settings and start a new deployment.
 
 ```yaml
 version: 1
@@ -764,16 +779,6 @@ I learned how to:
 I also learned that the smallest working architecture is not always the first architecture considered. Several services and features were intentionally removed because they were not required for the MVP.
 
 The final result is a focused serverless application that solves one repetitive task: deciding whether a YouTube video is worth watching before investing the time to watch it.
-
----
-
-## Live Demo
-
-Try the application here:
-
-[Open YouTube Video Summary](https://main.d25avzzlw30qwi.amplifyapp.com/)
-
-> **Note:** The live demo is available for a limited time.
 
 ---
 
