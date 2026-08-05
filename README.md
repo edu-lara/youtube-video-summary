@@ -416,12 +416,13 @@ aws sts get-caller-identity --profile youtube-video-summary
 
 Verify that the returned ARN contains `user/youtube-video-summary` and that the account ID is correct. The AWS CLI and AWS SAM commands in this guide explicitly use this named profile when accessing AWS.
 
-### 3. Criar um fork e clonar o repositório
+### 3. Fork and clone the repository
 
 Create a fork of this repository in your GitHub account. Then, clone your fork by replacing YOUR_USERNAME with your GitHub username:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/youtube-video-summary.git cd youtube-video-summary
+git clone https://github.com/YOUR_USERNAME/youtube-video-summary.git 
+cd youtube-video-summary
 ```
 
 Confirm that the remote repository points to your fork:
@@ -541,7 +542,7 @@ The `.env.local` file is ignored by Git and must not contain secrets. `VITE_API_
 
 ### 10. Test the deployed backend directly
 
-You can also send a request from the terminal. But this is optional and for testing purposes.
+You can also send a request directly from the terminal. This optional test verifies the backend without using the frontend.
 
 ```bash
 curl -sS -X POST "$FUNCTION_URL" \
@@ -635,6 +636,14 @@ sam deploy \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
   --profile youtube-video-summary
+```
+
+After confirming that the update was deployed successfully, push the production configuration to your fork:
+
+```bash
+git add template.yaml
+git commit -m "Restrict CORS to the Amplify domain"
+git push origin main
 ```
 
 Do not use `*` for a public deployment. CORS restricts browser origins, but it does not authenticate callers or prevent direct requests to the public Function URL.

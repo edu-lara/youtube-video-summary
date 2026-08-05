@@ -542,7 +542,7 @@ O arquivo `.env.local` está excluído do Git e não deve conter segredos. `VITE
 
 ### 10. Testar diretamente o backend implantado
 
-Também é possível enviar uma requisição pelo terminal. Mas isso é opcional e para propósito de testes.
+Também é possível enviar uma requisição diretamente pelo terminal. Este teste é opcional e serve para verificar o backend sem utilizar o frontend.
 
 ```bash
 curl -sS -X POST "$FUNCTION_URL" \
@@ -568,7 +568,7 @@ Em seguida, acesse o Console de Gerenciamento da AWS com uma identidade que tenh
 2. selecione **Criar novo aplicativo**;
 3. escolha GitHub como provedor do repositório e selecione Avançar;
 4. autorize o AWS Amplify a acessar a sua conta do GitHub;
-5. select your fork and the main branch;
+5. selecione o seu fork e a branch main;
 6. indique que o repositório é um monorepo;
 7. defina a raiz da aplicação como `frontend`;
 8. adicione a variável de ambiente `VITE_API_URL` com a Lambda Function URL;
@@ -636,6 +636,14 @@ sam deploy \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
   --profile youtube-video-summary
+```
+
+Após confirmar que a atualização foi implantada corretamente, envie a configuração de produção para o seu fork:
+
+```bash
+git add template.yaml
+git commit -m "Restrict CORS to the Amplify domain"
+git push origin main
 ```
 
 Não utilize `*` em uma implantação pública. O CORS restringe as origens dos navegadores, mas não autentica os clientes nem impede requisições diretas à Function URL pública.
