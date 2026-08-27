@@ -2,7 +2,7 @@
 
 🌐 **Language:** **English** \| [Português](README.pt-BR.md)
 
-![YouTube Video Summary](images/01.youtube-video-summary-home.png)
+![YouTube Video Summary](images/01.youtube-video-summary-home.jpg)
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon-Bedrock-blue)
