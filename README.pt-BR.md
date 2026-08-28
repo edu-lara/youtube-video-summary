@@ -51,11 +51,16 @@ A aplicação fornece:
 - um resumo conciso;
 - os principais pontos;
 - uma conclusão;
+- um mapa de conteúdo em ASCII;
 - o idioma detectado na transcrição;
 - a quantidade de caracteres da transcrição;
 - uma interface em inglês e português do Brasil.
 
-![Resumo de vídeo do YouTube gerado](images/04.application-summary.png)
+![Resumo de vídeo do YouTube gerado](images/04a.application-summary.png)
+
+Além do resumo textual, a aplicação gera um mapa de conteúdo em ASCII que organiza o tema central, os assuntos principais e seus subtópicos.
+
+![Mapa de conteúdo gerado](images/04b.application-contentmap.png)
 
 ---
 
@@ -75,7 +80,7 @@ O backend foi desenvolvido em **Python 3.13** e implantado com o **AWS SAM**. A 
 4. solicita a transcrição pública à Supadata;
 5. identifica o idioma da transcrição;
 6. invoca o Amazon Nova Micro por meio do Amazon Bedrock;
-7. retorna o resumo estruturado e a transcrição ao frontend.
+7. retorna o resumo estruturado, o mapa de conteúdo e a transcrição ao frontend.
 
 ### Principais decisões
 
@@ -126,6 +131,7 @@ As transcrições em inglês utilizam:
 ## Summary
 ## Key points
 ## Conclusion
+## Content Map
 ```
 
 As transcrições em português utilizam:
@@ -134,6 +140,7 @@ As transcrições em português utilizam:
 ## Resumo
 ## Principais pontos
 ## Conclusão
+## Mapa de conteúdo
 ```
 
 #### Conexão do Amplify com o backend
@@ -271,8 +278,7 @@ Antes de começar, instale ou prepare:
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html);
 - Git;
 - Python 3.13;
-- Node.js `20.19+` ou `22.12+`, com npm;
-- uma conta no GitHub e permissão para acessar o repositório ou seu fork;
+- uma conta no GitHub para criar um fork do repositório;
 - uma conta no [Supadata](https://supadata.ai/) e obtenha uma chave de API;
 - permissão para invocar o Amazon Nova Micro na região `us-east-1`.
 
@@ -451,24 +457,7 @@ Substitua `YOUR_SUPADATA_API_KEY` pela sua chave de API da Supadata. O parâmetr
 > [!NOTE]
 > Não envie a chave de API da Supadata ao repositório e não a exponha por meio de uma variável de ambiente do Vite.
 
-### 5. Configurar o CORS para o desenvolvimento local
-
-Antes de implantar sua cópia, abra o arquivo `template.yaml` e substitua o domínio atual do Amplify em `AllowOrigins` pela origem local do Vite:
-
-```yaml
-Cors:
-  AllowOrigins:
-    - "http://localhost:5173"
-  AllowMethods:
-    - POST
-  AllowHeaders:
-    - content-type
-  MaxAge: 600
-```
-
-Caso o Vite seja iniciado em outra porta, utilize a origem exata exibida pelo comando `npm run dev`.
-
-### 6. Validar e compilar o backend
+### 5. Validar e compilar o backend
 
 Na raiz do repositório, execute:
 
@@ -479,7 +468,9 @@ sam build
 
 A opção `--lint` valida o template do AWS SAM com o CloudFormation Linter. A saída da compilação é criada em `.aws-sam/`, que está excluído do Git.
 
-### 7. Implantar o backend
+### 6. Implantar inicialmente o backend
+
+O domínio de produção do Amplify ainda não existe. Nesta primeira implantação, utilize `https://example.invalid` como origem provisória. Esse domínio reservado não corresponde ao frontend e impede que uma origem de navegador seja autorizada antes da criação do aplicativo no Amplify.
 
 Implante a aplicação:
 
@@ -488,12 +479,16 @@ sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue=https://example.invalid \
   --profile youtube-video-summary
 ```
 
-Revise o conjunto de alterações do CloudFormation e confirme a implantação quando solicitado. O AWS SAM cria ou atualiza a pilha `youtube-video-summary` do CloudFormation.
+Revise o conjunto de alterações do CloudFormation e confirme a implantação quando solicitado. O AWS SAM cria a pilha `youtube-video-summary` do CloudFormation, a função Lambda e a Lambda Function URL.
 
-### 8. Obter a Lambda Function URL
+O valor provisório restringe o CORS do navegador, mas não autentica clientes nem impede requisições diretas à Function URL pública.
+
+### 7. Obter a Lambda Function URL
 
 Após a conclusão da implantação, obtenha o endpoint a partir da saída do CloudFormation:
 
@@ -514,33 +509,9 @@ O valor deverá seguir este formato:
 https://<url-id>.lambda-url.us-east-1.on.aws/
 ```
 
-### 9. Instalar e executar o frontend localmente
+Copie o valor exibido. Ele será utilizado como valor da variável de ambiente `VITE_API_URL` durante a criação do aplicativo no Amplify. Cada implantação que cria uma nova Function URL recebe um identificador diferente.
 
-Entre no diretório do frontend e crie um arquivo de ambiente local:
-
-```bash
-cd frontend
-printf 'VITE_API_URL=%s\n' "$FUNCTION_URL" > .env.local
-```
-
-Instale as versões exatas das dependências definidas em `package-lock.json` e inicie o Vite:
-
-```bash
-npm ci
-npm run dev
-```
-
-Abra o endereço local exibido pelo Vite, normalmente:
-
-```text
-http://localhost:5173
-```
-
-Após o teste, pressione `Ctrl+C` no terminal para encerrar o servidor local.
-
-O arquivo `.env.local` está excluído do Git e não deve conter segredos. `VITE_API_URL` é um endpoint público da aplicação, não uma credencial.
-
-### 10. Testar diretamente o backend implantado
+### 8. Testar diretamente o backend implantado
 
 Também é possível enviar uma requisição diretamente pelo terminal. Este teste é opcional e serve para verificar o backend sem utilizar o frontend.
 
@@ -552,17 +523,9 @@ curl -sS -X POST "$FUNCTION_URL" \
 
 Substitua `VIDEO_ID` pelo ID de um vídeo público do YouTube que tenha uma transcrição disponível.
 
-### 11. Implantar o frontend com o AWS Amplify Hosting
+### 9. Implantar o frontend com o AWS Amplify Hosting
 
-Envie as alterações feitas localmente para o seu fork no GitHub:
-
-```bash
-git add . 
-git commit -m "Configure the application for deployment" 
-git push origin main
-```
-
-Em seguida, acesse o Console de Gerenciamento da AWS com uma identidade que tenha permissão para criar e configurar aplicações no AWS Amplify Hosting:
+Acesse o Console de Gerenciamento da AWS com uma identidade que tenha permissão para criar e configurar aplicações no AWS Amplify Hosting:
 
 1. abra o console do AWS Amplify na região `us-east-1`;
 2. selecione **Criar novo aplicativo**;
@@ -571,11 +534,14 @@ Em seguida, acesse o Console de Gerenciamento da AWS com uma identidade que tenh
 5. selecione o seu fork e a branch main;
 6. indique que o repositório é um monorepo;
 7. defina a raiz da aplicação como `frontend`;
-8. adicione a variável de ambiente `VITE_API_URL` com a Lambda Function URL;
-9. crie a aplicação;
-10. abra **Hospedagem**, selecione **Configurações de compilação** e escolha **Editar**;
-11. substitua a especificação de compilação pela configuração abaixo;
-12. salve as configurações e inicie uma nova implantação.
+8. expanda **Configurações avançadas**;
+9. em **Variáveis do ambiente**, selecione **Adicionar novo**;
+10. informe `VITE_API_URL` como chave;
+11. cole como valor a Lambda Function URL obtida no passo 7;
+12. use `youtube-video-summary` como nome do aplicativo;
+13. crie a aplicação e inicie a implantação.
+
+Depois que o aplicativo for criado, abra **Hospedagem** e **Configurações de compilação**. Verifique se a especificação detectada automaticamente corresponde à configuração abaixo. Edite-a e inicie uma nova implantação somente se estiver diferente.
 
 ```yaml
 version: 1
@@ -600,55 +566,66 @@ applications:
 
 Essa especificação de compilação é configurada diretamente no AWS Amplify Hosting e não precisa ser armazenada como um arquivo `amplify.yml` no repositório.
 
-As variáveis de ambiente do Amplify ficam disponíveis durante a compilação. Como o Vite incorpora `VITE_API_URL` ao frontend, inicie uma nova implantação no Amplify após alterar o valor dessa variável.
+As variáveis de ambiente do Amplify ficam disponíveis durante a compilação. Como o Vite incorpora `VITE_API_URL` ao frontend, uma alteração futura nessa variável exige uma nova implantação do frontend.
 
-### 12. Restringir o CORS ao domínio do Amplify
+### 10. Restringir o CORS ao domínio do Amplify
 
-Depois que o Amplify fornecer o domínio de produção, retorne ao arquivo `template.yaml` e substitua a origem local pelo seu domínio do Amplify:
+Depois que a implantação terminar, copie o domínio completo da branch `main` fornecido pelo Amplify, sem a barra final. O endereço terá este formato:
 
-```yaml
-Cors:
-  AllowOrigins:
-    - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
-  AllowMethods:
-    - POST
-  AllowHeaders:
-    - content-type
-  MaxAge: 600
+```text
+https://main.YOUR_APP_ID.amplifyapp.com
 ```
 
-Para manter o acesso local e de produção durante o desenvolvimento, inclua as duas origens exatas:
-
-```yaml
-AllowOrigins:
-  - "http://localhost:5173"
-  - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
-```
-
-Retorne à raiz do repositório e implante a atualização do CORS:
+Defina a origem, substituindo `YOUR_APP_ID` pelo identificador real exibido pelo Amplify:
 
 ```bash
-cd ..
-sam validate --lint
-sam build
+AMPLIFY_ORIGIN="https://main.YOUR_APP_ID.amplifyapp.com"
+echo "$AMPLIFY_ORIGIN"
+```
+
+Implante novamente o backend com a origem definitiva:
+
+```bash
 sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue="$AMPLIFY_ORIGIN" \
   --profile youtube-video-summary
 ```
 
-Após confirmar que a atualização foi implantada corretamente, envie a configuração de produção para o seu fork:
-
-```bash
-git add template.yaml
-git commit -m "Restrict CORS to the Amplify domain"
-git push origin main
-```
+Essa segunda implantação altera somente o parâmetro usado pelo CORS. Não é necessário editar o `template.yaml` nem executar `sam build` novamente.
 
 Não utilize `*` em uma implantação pública. O CORS restringe as origens dos navegadores, mas não autentica os clientes nem impede requisições diretas à Function URL pública.
 
-### 13. Testar a aplicação em produção
+### 11. Validar o CORS
+
+Confirme a configuração registrada na Function URL:
+
+```bash
+aws lambda get-function-url-config \
+  --function-name youtube-video-summary \
+  --region us-east-1 \
+  --profile youtube-video-summary \
+  --query "Cors" \
+  --output yaml
+```
+
+O resultado deverá apresentar o domínio completo do Amplify em `AllowOrigins`, além de `POST` em `AllowMethods` e `content-type` em `AllowHeaders`.
+
+Teste também a requisição preliminar do navegador:
+
+```bash
+curl -i -X OPTIONS "$FUNCTION_URL" \
+  -H "Origin: $AMPLIFY_ORIGIN" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+A resposta deverá retornar `HTTP 200` e os cabeçalhos `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods` e `Access-Control-Allow-Headers` com os valores configurados.
+
+### 12. Testar a aplicação em produção
 
 Abra o domínio do Amplify e confirme se:
 
@@ -676,31 +653,28 @@ Na raiz do repositório, execute:
 ```bash
 sam validate --lint
 sam build
+ALLOWED_ORIGIN=$(aws lambda get-function-url-config \
+  --function-name youtube-video-summary \
+  --region us-east-1 \
+  --profile youtube-video-summary \
+  --query "Cors.AllowOrigins[0]" \
+  --output text)
 sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue="$ALLOWED_ORIGIN" \
   --profile youtube-video-summary
 ```
 
-A implantação atualiza a pilha existente `youtube-video-summary` do CloudFormation.
+A implantação atualiza a pilha existente `youtube-video-summary` do CloudFormation e preserva a origem atualmente autorizada.
 
 ### Alterações no frontend
 
-Arquivos como `frontend/src/App.jsx`, `frontend/src/App.css` e outros arquivos dentro de `frontend/` não são implantados pelo AWS SAM.
-
-Teste uma alteração no frontend localmente:
+Arquivos como `frontend/src/App.jsx`, `frontend/src/App.css` e outros arquivos dentro de `frontend/` não são implantados pelo AWS SAM. Após realizar uma alteração, faça o commit e envie-a para a branch do GitHub conectada ao AWS Amplify:
 
 ```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-Após confirmar a alteração, retorne à raiz do repositório, faça o commit e envie a alteração para a branch do GitHub conectada ao AWS Amplify:
-
-```bash
-cd ..
 git add frontend
 git commit -m "Update frontend"
 git push
@@ -708,7 +682,7 @@ git push
 
 O AWS Amplify compila e implanta automaticamente a branch conectada quando as compilações automáticas estão habilitadas. Não é necessário executar `sam build` ou `sam deploy` quando apenas o arquivo `App.jsx` ou outro arquivo do frontend for alterado.
 
-Não envie o arquivo `frontend/.env.local` ao repositório. Caso `VITE_API_URL` seja alterada, atualize seu valor nas variáveis de ambiente do AWS Amplify e inicie uma nova implantação.
+Caso a Lambda Function URL seja alterada, atualize `VITE_API_URL` nas variáveis de ambiente do AWS Amplify e inicie uma nova implantação.
 
 ---
 
@@ -716,7 +690,18 @@ Não envie o arquivo `frontend/.env.local` ao repositório. Caso `VITE_API_URL` 
 
 Remova o ambiente quando ele não for mais necessário. Mantenha o usuário IAM exclusivo ativo até que todos os comandos de limpeza pela CLI sejam concluídos.
 
-### 1. Excluir a aplicação do AWS SAM
+### 1. Excluir a aplicação do AWS Amplify
+
+No console do AWS Amplify:
+
+1. abra a aplicação;
+2. abra as configurações da aplicação;
+3. selecione **Excluir aplicativo**;
+4. confirme a exclusão.
+
+Isso remove o frontend hospedado e seu domínio do Amplify.
+
+### 2. Excluir a aplicação do AWS SAM
 
 Na raiz do repositório, execute:
 
@@ -730,17 +715,6 @@ sam delete \
 Confirme a exclusão quando solicitado.
 
 O AWS SAM exclui a pilha `youtube-video-summary` do CloudFormation e os recursos gerenciados por ela, incluindo a função Lambda, a Lambda Function URL e a função de execução da Lambda. Não exclua novamente a mesma pilha da aplicação no console do AWS CloudFormation.
-
-### 2. Excluir a aplicação do AWS Amplify
-
-No console do AWS Amplify:
-
-1. abra a aplicação;
-2. abra as configurações da aplicação;
-3. selecione **Excluir aplicativo**;
-4. confirme a exclusão.
-
-Isso remove o frontend hospedado e seu domínio do Amplify.
 
 ### 3. Excluir o parâmetro da Supadata
 

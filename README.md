@@ -51,11 +51,16 @@ The application provides:
 - a concise summary;
 - the main points;
 - a conclusion;
+- an ASCII content map;
 - the detected transcript language;
 - the transcript character count;
 - an interface in English and Brazilian Portuguese.
 
-![Generated YouTube video summary](images/04.application-summary.png)
+![Generated YouTube video summary](images/04a.application-summary.png)
+
+In addition to the written summary, the application generates an ASCII content map that organizes the central topic, main topics, and their subtopics.
+
+![Generated content map](images/04b.application-contentmap.png)
 
 ---
 
@@ -75,7 +80,7 @@ The backend was developed in **Python 3.13** and deployed with **AWS SAM**. The 
 4. requests the public transcript from Supadata;
 5. identifies the transcript language;
 6. invokes Amazon Nova Micro through Amazon Bedrock;
-7. returns the structured summary and transcript to the frontend.
+7. returns the structured summary, content map, and transcript to the frontend.
 
 ### Key decisions
 
@@ -126,6 +131,7 @@ English transcripts now use:
 ## Summary
 ## Key points
 ## Conclusion
+## Content Map
 ```
 
 Portuguese transcripts use:
@@ -134,6 +140,7 @@ Portuguese transcripts use:
 ## Resumo
 ## Principais pontos
 ## Conclusão
+## Mapa de conteúdo
 ```
 
 #### Connecting Amplify to the backend
@@ -271,8 +278,7 @@ Before starting, install or prepare:
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html);
 - Git;
 - Python 3.13;
-- Node.js `20.19+` or `22.12+`, with npm;
-- a GitHub account and permission to access the repository or your fork;
+- a GitHub account to create a fork of the repository;
 - a [Supadata](https://supadata.ai/) account and API key;
 - permission to invoke Amazon Nova Micro in `us-east-1`.
 
@@ -451,24 +457,7 @@ Replace `YOUR_SUPADATA_API_KEY` with your Supadata API key. The parameter must e
 > [!NOTE]
 > Do not commit the Supadata API key to the repository or expose it through a Vite environment variable.
 
-### 5. Configure CORS for local development
-
-Before deploying your copy, open `template.yaml` and replace the existing Amplify domain under `AllowOrigins` with your local Vite origin:
-
-```yaml
-Cors:
-  AllowOrigins:
-    - "http://localhost:5173"
-  AllowMethods:
-    - POST
-  AllowHeaders:
-    - content-type
-  MaxAge: 600
-```
-
-If Vite starts on a different port, use the exact origin displayed by `npm run dev`.
-
-### 6. Validate and build the backend
+### 5. Validate and build the backend
 
 From the repository root, run:
 
@@ -479,7 +468,9 @@ sam build
 
 The lint option validates the AWS SAM template with CloudFormation Linter. The build output is created in `.aws-sam/`, which is excluded from Git.
 
-### 7. Deploy the backend
+### 6. Initially deploy the backend
+
+The Amplify production domain does not exist yet. For this first deployment, use `https://example.invalid` as a temporary origin. This reserved domain does not match the frontend and prevents a browser origin from being authorized before the Amplify app is created.
 
 Deploy the application:
 
@@ -488,12 +479,16 @@ sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue=https://example.invalid \
   --profile youtube-video-summary
 ```
 
-Review the CloudFormation change set and confirm the deployment when prompted. AWS SAM creates or updates the `youtube-video-summary` CloudFormation stack.
+Review the CloudFormation change set and confirm the deployment when prompted. AWS SAM creates the `youtube-video-summary` CloudFormation stack, Lambda function, and Lambda Function URL.
 
-### 8. Retrieve the Lambda Function URL
+The temporary value restricts browser CORS, but it does not authenticate clients or prevent direct requests to the public Function URL.
+
+### 7. Retrieve the Lambda Function URL
 
 After the deployment completes, obtain the endpoint from the CloudFormation output:
 
@@ -514,33 +509,9 @@ The value should follow this format:
 https://<url-id>.lambda-url.us-east-1.on.aws/
 ```
 
-### 9. Install and run the frontend locally
+Copy the displayed value. You will use it as the value of the `VITE_API_URL` environment variable when creating the Amplify app. Each deployment that creates a new Function URL receives a different identifier.
 
-Enter the frontend directory and create a local environment file:
-
-```bash
-cd frontend
-printf 'VITE_API_URL=%s\n' "$FUNCTION_URL" > .env.local
-```
-
-Install the exact dependency versions from `package-lock.json` and start Vite:
-
-```bash
-npm ci
-npm run dev
-```
-
-Open the local address displayed by Vite, normally:
-
-```text
-http://localhost:5173
-```
-
-After testing, press `Ctrl+C` in the terminal to stop the local server.
-
-The `.env.local` file is ignored by Git and must not contain secrets. `VITE_API_URL` is a public application endpoint, not a credential.
-
-### 10. Test the deployed backend directly
+### 8. Test the deployed backend directly
 
 You can also send a request directly from the terminal. This optional test verifies the backend without using the frontend.
 
@@ -552,17 +523,9 @@ curl -sS -X POST "$FUNCTION_URL" \
 
 Replace `VIDEO_ID` with a public YouTube video that has an available transcript.
 
-### 11. Deploy the frontend with AWS Amplify Hosting
+### 9. Deploy the frontend with AWS Amplify Hosting
 
-Push the changes made locally to your fork on GitHub:
-
-```bash
-git add . 
-git commit -m "Configure the application for deployment" 
-git push origin main
-```
-
-Then, sign in to the AWS Management Console using an identity with permission to create and configure applications in AWS Amplify Hosting:
+Sign in to the AWS Management Console using an identity with permission to create and configure applications in AWS Amplify Hosting:
 
 1. open the AWS Amplify console in `us-east-1`;
 2. select **Create new app**;
@@ -571,11 +534,14 @@ Then, sign in to the AWS Management Console using an identity with permission to
 5. select your fork and the main branch;
 6. indicate that the repository is a monorepo;
 7. set the application root to `frontend`;
-8. add the environment variable `VITE_API_URL` with the Lambda Function URL;
-9. create the application;
-10. open **Hosting**, select **Build settings**, and choose **Edit**;
-11. replace the build specification with the configuration below;
-12. save the settings and start a new deployment.
+8. expand **Advanced settings**;
+9. under **Environment variables**, select **Add new**;
+10. enter `VITE_API_URL` as the key;
+11. paste the Lambda Function URL retrieved in step 7 as the value;
+12. use `youtube-video-summary` as the application name;
+13. create the application and start the deployment.
+
+After the application is created, open **Hosting** and **Build settings**. Verify that the automatically detected specification matches the configuration below. Edit it and start a new deployment only if it is different.
 
 ```yaml
 version: 1
@@ -600,55 +566,66 @@ applications:
 
 This build specification is configured directly in AWS Amplify Hosting and does not need to be stored as an `amplify.yml` file in the repository.
 
-Amplify environment variables are available during the build. Because Vite bundles `VITE_API_URL` into the frontend, start a new Amplify deployment after changing its value.
+Amplify environment variables are available during the build. Because Vite bundles `VITE_API_URL` into the frontend, a future change to this variable requires a new frontend deployment.
 
-### 12. Restrict CORS to your Amplify domain
+### 10. Restrict CORS to your Amplify domain
 
-After Amplify provides the production domain, return to `template.yaml` and replace the local origin with your own Amplify origin:
+After the deployment finishes, copy the complete main branch domain provided by Amplify, without the trailing slash. The address follows this format:
 
-```yaml
-Cors:
-  AllowOrigins:
-    - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
-  AllowMethods:
-    - POST
-  AllowHeaders:
-    - content-type
-  MaxAge: 600
+```text
+https://main.YOUR_APP_ID.amplifyapp.com
 ```
 
-To keep both local and production access during development, include both exact origins:
-
-```yaml
-AllowOrigins:
-  - "http://localhost:5173"
-  - "https://YOUR_BRANCH.YOUR_APP_ID.amplifyapp.com"
-```
-
-Return to the repository root and deploy the CORS update:
+Set the origin by replacing `YOUR_APP_ID` with the actual identifier displayed by Amplify:
 
 ```bash
-cd ..
-sam validate --lint
-sam build
+AMPLIFY_ORIGIN="https://main.YOUR_APP_ID.amplifyapp.com"
+echo "$AMPLIFY_ORIGIN"
+```
+
+Deploy the backend again with the final origin:
+
+```bash
 sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue="$AMPLIFY_ORIGIN" \
   --profile youtube-video-summary
 ```
 
-After confirming that the update was deployed successfully, push the production configuration to your fork:
-
-```bash
-git add template.yaml
-git commit -m "Restrict CORS to the Amplify domain"
-git push origin main
-```
+This second deployment changes only the parameter used by CORS. You do not need to edit `template.yaml` or run `sam build` again.
 
 Do not use `*` for a public deployment. CORS restricts browser origins, but it does not authenticate callers or prevent direct requests to the public Function URL.
 
-### 13. Test the production application
+### 11. Validate CORS
+
+Confirm the configuration registered on the Function URL:
+
+```bash
+aws lambda get-function-url-config \
+  --function-name youtube-video-summary \
+  --region us-east-1 \
+  --profile youtube-video-summary \
+  --query "Cors" \
+  --output yaml
+```
+
+The result must show the complete Amplify domain under `AllowOrigins`, along with `POST` under `AllowMethods` and `content-type` under `AllowHeaders`.
+
+Also test the browser preflight request:
+
+```bash
+curl -i -X OPTIONS "$FUNCTION_URL" \
+  -H "Origin: $AMPLIFY_ORIGIN" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+The response must return `HTTP 200` and the `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers` headers with the configured values.
+
+### 12. Test the production application
 
 Open the Amplify domain and confirm that:
 
@@ -676,31 +653,28 @@ From the repository root, run:
 ```bash
 sam validate --lint
 sam build
+ALLOWED_ORIGIN=$(aws lambda get-function-url-config \
+  --function-name youtube-video-summary \
+  --region us-east-1 \
+  --profile youtube-video-summary \
+  --query "Cors.AllowOrigins[0]" \
+  --output text)
 sam deploy \
   --stack-name youtube-video-summary \
   --region us-east-1 \
   --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    ParameterKey=AllowedOrigin,ParameterValue="$ALLOWED_ORIGIN" \
   --profile youtube-video-summary
 ```
 
-The deployment updates the existing `youtube-video-summary` CloudFormation stack.
+The deployment updates the existing `youtube-video-summary` CloudFormation stack and preserves the currently allowed origin.
 
 ### Frontend changes
 
-Files such as `frontend/src/App.jsx`, `frontend/src/App.css`, and other files under `frontend/` are not deployed by AWS SAM.
-
-Test a frontend change locally:
+Files such as `frontend/src/App.jsx`, `frontend/src/App.css`, and other files under `frontend/` are not deployed by AWS SAM. After making a change, commit it and push it to the GitHub branch connected to AWS Amplify:
 
 ```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-After confirming the change, return to the repository root, commit it, and push it to the GitHub branch connected to AWS Amplify:
-
-```bash
-cd ..
 git add frontend
 git commit -m "Update frontend"
 git push
@@ -708,7 +682,7 @@ git push
 
 AWS Amplify automatically builds and deploys the connected branch when automatic builds are enabled. You do not need to run `sam build` or `sam deploy` when only `App.jsx` or another frontend file changes.
 
-Do not commit `frontend/.env.local`. If `VITE_API_URL` changes, update it in the AWS Amplify environment variables and start a new Amplify deployment.
+If the Lambda Function URL changes, update `VITE_API_URL` in the AWS Amplify environment variables and start a new deployment.
 
 ---
 
@@ -716,7 +690,18 @@ Do not commit `frontend/.env.local`. If `VITE_API_URL` changes, update it in the
 
 Remove the environment when it is no longer required. Keep the dedicated IAM user active until all CLI-based cleanup commands are complete.
 
-### 1. Delete the AWS SAM application
+### 1. Delete the AWS Amplify application
+
+In the AWS Amplify console:
+
+1. open the application;
+2. open the application settings;
+3. select **Delete app**;
+4. confirm the deletion.
+
+This removes the hosted frontend and its Amplify domain.
+
+### 2. Delete the AWS SAM application
 
 From the repository root, run:
 
@@ -730,17 +715,6 @@ sam delete \
 Confirm the deletion when prompted.
 
 AWS SAM deletes the `youtube-video-summary` CloudFormation stack and the resources managed by it, including the Lambda function, Lambda Function URL, and Lambda execution role. Do not delete the same application stack separately in the AWS CloudFormation console.
-
-### 2. Delete the AWS Amplify application
-
-In the AWS Amplify console:
-
-1. open the application;
-2. open the application settings;
-3. select **Delete app**;
-4. confirm the deletion.
-
-This removes the hosted frontend and its Amplify domain.
 
 ### 3. Delete the Supadata parameter
 
