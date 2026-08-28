@@ -2,7 +2,7 @@
 
 🌐 **Language:** **English** \| [Português](README.pt-BR.md)
 
-![YouTube Video Summary](images/01.youtube-video-summary-home.jpg)
+![YouTube Video Summary](images/01.youtube-video-summary-weekend-showcase.jpg)
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon-Bedrock-blue)
@@ -26,7 +26,7 @@
 | Secret Storage | AWS Systems Manager Parameter Store |
 | Hosting | AWS Amplify Hosting |
 
-AI-powered serverless application built for the **AWS Weekend Challenge: Turn One Annoying Task into an App**.
+AI-powered serverless application built for the **Weekend Showcase Challenge: YouTube Video Summary**.
 
 YouTube Video Summary accepts a YouTube URL, retrieves the available transcript, identifies its original language, and uses Amazon Bedrock to generate a clear, structured summary in that same language.
 

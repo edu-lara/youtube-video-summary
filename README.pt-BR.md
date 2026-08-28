@@ -2,7 +2,7 @@
 
 🌐 **Idioma:** [English](README.md) \| **Português**
 
-![YouTube Video Summary](images/01.youtube-video-summary-home.jpg)
+![YouTube Video Summary](images/01.youtube-video-summary-weekend-showcase.jpg)
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon-Bedrock-blue)
@@ -26,7 +26,7 @@
 | Armazenamento do segredo | AWS Systems Manager Parameter Store |
 | Hospedagem | AWS Amplify Hosting |
 
-Aplicação serverless com inteligência artificial criada para o **AWS Weekend Challenge: Turn One Annoying Task into an App**.
+Aplicação serverless com inteligência artificial desenvolvida para o **Weekend Showcase Challenge: YouTube Video Summary**.
 
 O YouTube Video Summary recebe uma URL do YouTube, obtém a transcrição disponível, identifica seu idioma original e usa o Amazon Bedrock para gerar um resumo claro e estruturado no mesmo idioma.
 
