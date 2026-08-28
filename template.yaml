@@ -5,6 +5,11 @@ Description: >
   Versao minima de uma aplicacao que recebe uma URL do YouTube,
   obtem a legenda e gera um resumo com Amazon Bedrock.
 
+Parameters:
+  AllowedOrigin:
+    Type: String
+    Description: Origem autorizada para acessar a URL da funcao Lambda.
+
 Globals:
   Function:
     Runtime: python3.13
