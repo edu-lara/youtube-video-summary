@@ -377,6 +377,56 @@ button {
   overflow-wrap: anywhere;
 }
 
+.content-map-section {
+  margin-top: 32px;
+}
+
+.content-map-section h3 {
+  margin: 0 0 14px;
+  color: #172033;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.content-map {
+  width: 100%;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #1e293b;
+  font-family:
+    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  box-shadow: inset 0 2px 4px rgba(16, 24, 40, 0.03);
+}
+
+@media (max-width: 720px) {
+  .content-map-section h3 {
+    font-size: 0.86rem;
+  }
+
+  .content-map {
+    font-size: 0.78rem;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 440px) {
+  .content-map-section h3 {
+    font-size: 0.82rem;
+  }
+
+  .content-map {
+    font-size: 0.74rem;
+    padding: 12px;
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -432,5 +482,14 @@ button {
 
   .summary-form button {
     width: 100%;
+  }
+
+  .content-map-section h3 {
+    font-size: 0.82rem;
+  }
+
+  .content-map {
+    font-size: 0.74rem;
+    padding: 12px;
   }
 }

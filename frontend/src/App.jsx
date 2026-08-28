@@ -25,6 +25,7 @@ const translations = {
     transcriptLanguage: 'Detected language',
     transcriptSize: 'Transcript size',
     characters: 'characters',
+    contentMap: 'Content map',
   },
   pt: {
     language: 'Idioma',
@@ -47,6 +48,7 @@ const translations = {
     transcriptLanguage: 'Idioma identificado',
     transcriptSize: 'Tamanho da legenda',
     characters: 'caracteres',
+    contentMap: 'Mapa de conteúdo',
   },
 }
 
@@ -54,6 +56,7 @@ function App() {
   const [interfaceLanguage, setInterfaceLanguage] = useState('en')
   const [videoUrl, setVideoUrl] = useState('')
   const [summary, setSummary] = useState('')
+  const [contentMap, setContentMap] = useState('')
   const [transcriptLanguage, setTranscriptLanguage] = useState('')
   const [transcriptCharacters, setTranscriptCharacters] = useState(null)
   const [error, setError] = useState('')
@@ -82,6 +85,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept-Language': interfaceLanguage,
         },
         body: JSON.stringify({
           url: normalizedUrl,
@@ -104,6 +108,7 @@ function App() {
       }
 
       setSummary(data.summary || data.resumo || '')
+      setContentMap(data.contentMap || data.mapaDeConteudo || '')
       setTranscriptLanguage(data.transcriptLanguage || '')
       setTranscriptCharacters(data.transcriptCharacters ?? null)
     } catch (requestError) {
@@ -220,6 +225,13 @@ function App() {
             </header>
 
             <article className="summary-content">{summary}</article>
+
+            {contentMap && (
+              <section className="content-map-section">
+                <h3>{text.contentMap}</h3>
+                <pre className="content-map">{contentMap}</pre>
+              </section>
+            )}
           </section>
         )}
       </section>

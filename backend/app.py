@@ -30,12 +30,33 @@ ssm = boto3.client("ssm")
 _supadata_api_key: str | None = None
 
 
+def get_preferred_language(event: dict[str, Any]) -> str:
+    """Extract the preferred language from the Accept-Language header."""
+    headers = (
+        event.get("headers", {})
+        or event.get("requestContext", {})
+        .get("http", {})
+        .get("headers", {})
+    )
+    
+    accept_language = headers.get("accept-language", "")
+    
+    if accept_language:
+        # Extract first language from Accept-Language header
+        # e.g., "pt-BR,pt;q=0.9,en;q=0.8" -> "pt"
+        first_lang = accept_language.split(",")[0].strip()
+        return first_lang.split(";")[0].strip()[:2].lower()
+    
+    # Default to English
+    return "en"
+
+
 class ValidationError(Exception):
-    """Erro causado por dados inválidos enviados pelo usuário."""
+    """Error caused by invalid data sent by the user."""
 
 
 class TranscriptError(Exception):
-    """Erro ao recuperar ou processar a legenda."""
+    """Error retrieving or processing the transcript."""
 
 
 def build_response(status_code: int, body: dict[str, Any]) -> dict[str, Any]:
@@ -62,7 +83,7 @@ def parse_request_body(event: dict[str, Any]) -> dict[str, Any]:
     body = event.get("body")
 
     if not body:
-        raise ValidationError("O corpo da solicitação está vazio.")
+        raise ValidationError("The request body is empty.")
 
     if event.get("isBase64Encoded"):
         body = base64.b64decode(body).decode("utf-8")
@@ -70,27 +91,27 @@ def parse_request_body(event: dict[str, Any]) -> dict[str, Any]:
     try:
         parsed_body = json.loads(body)
     except json.JSONDecodeError as error:
-        raise ValidationError("O corpo precisa ser um JSON válido.") from error
+        raise ValidationError("The body must be a valid JSON.") from error
 
     if not isinstance(parsed_body, dict):
-        raise ValidationError("O corpo precisa ser um objeto JSON.")
+        raise ValidationError("The body must be a JSON object.")
 
     return parsed_body
 
 
 def validate_youtube_url(video_url: str) -> str:
     if not isinstance(video_url, str) or not video_url.strip():
-        raise ValidationError("Informe a URL do vídeo.")
+        raise ValidationError("Please provide the video URL.")
 
     video_url = video_url.strip()
 
     try:
         parsed = urlparse(video_url)
     except ValueError as error:
-        raise ValidationError("A URL informada é inválida.") from error
+        raise ValidationError("The provided URL is invalid.") from error
 
-    if parsed.scheme not in {"http", "https"}:
-        raise ValidationError("A URL deve começar com http:// ou https://.")
+    if parsed.scheme != "https":
+        raise ValidationError("The URL must start with https://.")
 
     hostname = (parsed.hostname or "").lower()
 
@@ -101,7 +122,7 @@ def validate_youtube_url(video_url: str) -> str:
     )
 
     if not valid_hostname:
-        raise ValidationError("Informe uma URL válida do YouTube.")
+        raise ValidationError("Please provide a valid YouTube URL.")
 
     return video_url
 
@@ -127,7 +148,7 @@ def get_supadata_api_key() -> str:
             )
         )
         raise TranscriptError(
-            "Não foi possível carregar a configuração da API de legendas."
+            "Could not load the transcript API configuration."
         ) from error
 
     _supadata_api_key = response["Parameter"]["Value"]
@@ -172,13 +193,13 @@ def request_supadata(
         )
     except requests.RequestException as error:
         raise TranscriptError(
-            "Não foi possível se comunicar com o serviço de legendas."
+            "Could not communicate with the transcript service."
         ) from error
 
 
 def process_transcript_response(data: dict[str, Any]) -> tuple[str, str]:
     content = normalize_transcript_content(data.get("content"))
-    language = str(data.get("lang") or "desconhecido")
+    language = str(data.get("lang") or "unknown")
 
     if not content:
         error_data = data.get("error")
@@ -190,7 +211,7 @@ def process_transcript_response(data: dict[str, Any]) -> tuple[str, str]:
                 raise TranscriptError(str(details))
 
         raise TranscriptError(
-            "A API não encontrou uma legenda pública para esse vídeo."
+            "The API did not find a public transcript for this video."
         )
 
     return content, language
@@ -208,7 +229,7 @@ def poll_transcript_job(job_id: str) -> tuple[str, str]:
             data = response.json()
         except ValueError as error:
             raise TranscriptError(
-                "O serviço de legendas retornou uma resposta inválida."
+                "The transcript service returned an invalid response."
             ) from error
 
         status = data.get("status")
@@ -223,15 +244,15 @@ def poll_transcript_job(job_id: str) -> tuple[str, str]:
                 message = (
                     error_data.get("details")
                     or error_data.get("message")
-                    or "A obtenção da legenda falhou."
+                    or "Transcript retrieval failed."
                 )
             else:
-                message = "A obtenção da legenda falhou."
+                message = "Transcript retrieval failed."
 
             raise TranscriptError(str(message))
 
     raise TranscriptError(
-        "A legenda está demorando mais do que o esperado para ser processada."
+        "The transcript is taking longer than expected to process."
     )
 
 
@@ -249,7 +270,7 @@ def get_transcript(video_url: str) -> tuple[str, str]:
         data = response.json()
     except ValueError as error:
         raise TranscriptError(
-            "O serviço de legendas retornou uma resposta inválida."
+            "The transcript service returned an invalid response."
         ) from error
 
     if response.status_code == 202:
@@ -257,21 +278,21 @@ def get_transcript(video_url: str) -> tuple[str, str]:
 
         if not isinstance(job_id, str) or not job_id:
             raise TranscriptError(
-                "O serviço iniciou o processamento, mas não retornou o identificador."
+                "The service started processing but did not return the identifier."
             )
 
         return poll_transcript_job(job_id)
 
     if response.status_code == 206:
         raise TranscriptError(
-            "O vídeo não possui uma legenda pública disponível."
+            "The video does not have a public transcript available."
         )
 
     if not response.ok:
         message = (
             data.get("details")
             or data.get("message")
-            or "Não foi possível obter a legenda."
+            or "Could not retrieve the transcript."
         )
 
         raise TranscriptError(str(message))
@@ -279,30 +300,29 @@ def get_transcript(video_url: str) -> tuple[str, str]:
     return process_transcript_response(data)
 
 
-def generate_summary(transcript: str, transcript_language: str) -> str:
-    language_code = transcript_language.lower().strip()
-
-    if language_code.startswith("pt"):
-        output_language = "Brazilian Portuguese"
-        summary_heading = "Resumo"
-        key_points_heading = "Principais pontos"
-        conclusion_heading = "Conclusão"
-    elif language_code.startswith("en"):
+def generate_summary(
+    transcript: str,
+    transcript_language: str,
+    preferred_language: str = "en",
+) -> tuple[str, str]:
+    # Map preferred language to output language for prompts
+    language_map = {
+        "pt": "Brazilian Portuguese",
+        "en": "English",
+    }
+    
+    if preferred_language in language_map:
+        output_language = language_map[preferred_language]
+        summary_heading = "Summary" if preferred_language == "en" else "Resumo"
+        key_points_heading = "Key points" if preferred_language == "en" else "Principais pontos"
+        conclusion_heading = "Conclusion" if preferred_language == "en" else "Conclusão"
+        content_map_heading = "Content Map" if preferred_language == "en" else "Mapa de conteúdo"
+    else:
         output_language = "English"
         summary_heading = "Summary"
         key_points_heading = "Key points"
         conclusion_heading = "Conclusion"
-    else:
-        output_language = (
-            "the predominant language used in the transcript"
-        )
-        summary_heading = "Summary translated into the transcript language"
-        key_points_heading = (
-            "Key points translated into the transcript language"
-        )
-        conclusion_heading = (
-            "Conclusion translated into the transcript language"
-        )
+        content_map_heading = "Content Map"
 
     prompt = f"""
 Create a clear and structured summary of the content below.
@@ -314,6 +334,7 @@ Mandatory headings:
 ## {summary_heading}
 ## {key_points_heading}
 ## {conclusion_heading}
+## {content_map_heading}
 
 Language requirements:
 1. Write every sentence in {output_language}.
@@ -344,6 +365,22 @@ Present between five and ten bullet points.
 
 Present the main conclusion or final message.
 
+## {content_map_heading}
+
+Create a compact ASCII content map that visually organizes the central
+topic, main topics, and relevant subtopics from the content.
+
+Content map requirements:
+1. Use plain ASCII characters only, such as |, +, -, and >.
+2. Use one central topic.
+3. Include between three and five main topics when the content supports them.
+4. Include no more than three subtopics under each main topic.
+5. Use no more than three hierarchy levels.
+6. Keep labels short and clear.
+7. Represent thematic hierarchy only. Do not invent relationships.
+8. Use only information contained in the supplied content.
+9. Wrap the complete ASCII map in a fenced text code block.
+
 Content:
 
 <content>
@@ -357,7 +394,7 @@ Content:
             system=[
                 {
                     "text": (
-                        f"You summarize educational content accurately. "
+                        f"You analyze and summarize video transcript content accurately. "
                         f"You must answer only in {output_language}. "
                         f"Do not mix languages. "
                         f"Follow the requested headings exactly."
@@ -371,7 +408,7 @@ Content:
                 }
             ],
             inferenceConfig={
-                "maxTokens": 1_500,
+                "maxTokens": 2_000,
                 "temperature": 0.1,
                 "topP": 0.9,
             },
@@ -386,7 +423,7 @@ Content:
             )
         )
         raise RuntimeError(
-            "Não foi possível gerar o resumo no Amazon Bedrock."
+            "Could not generate the summary in Amazon Bedrock."
         ) from error
 
     content_blocks = (
@@ -395,18 +432,30 @@ Content:
         .get("content", [])
     )
 
-    summary_parts = [
-        block["text"]
-        for block in content_blocks
-        if isinstance(block, dict) and isinstance(block.get("text"), str)
-    ]
+    summary_parts = []
+    content_map_parts = []
+    current_section = None
+
+    for block in content_blocks:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            text = block["text"]
+            lines = text.split("\n")
+            
+            for line in lines:
+                if f"## {content_map_heading}" in line:
+                    current_section = "content_map"
+                elif current_section == "content_map":
+                    content_map_parts.append(line)
+                elif current_section is None:
+                    summary_parts.append(line)
 
     summary = "\n".join(summary_parts).strip()
+    content_map = "\n".join(content_map_parts).strip()
 
     if not summary:
-        raise RuntimeError("O Amazon Bedrock não retornou um resumo.")
+        raise RuntimeError("Amazon Bedrock did not return a summary.")
 
-    return summary
+    return summary, content_map
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -422,9 +471,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             405,
             {
                 "error": "method_not_allowed",
-                "message": "Utilize o método POST.",
+                "message": "Use the POST method.",
             },
         )
+
+    preferred_language = get_preferred_language(event)
 
     try:
         request_body = parse_request_body(event)
@@ -434,13 +485,14 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         if len(transcript) > MAX_TRANSCRIPT_CHARS:
             raise ValidationError(
-                "A legenda é muito longa para a versão mínima. "
-                "Utilize um vídeo mais curto."
+                "The transcript is too long for the free tier. "
+                "Please use a shorter video."
             )
 
-        summary = generate_summary(
+        summary, content_map = generate_summary(
             transcript=transcript,
             transcript_language=transcript_language,
+            preferred_language=preferred_language,
         )
 
         return build_response(
@@ -450,6 +502,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "transcriptLanguage": transcript_language,
                 "transcriptCharacters": len(transcript),
                 "summary": summary,
+                "contentMap": content_map,
                 "transcript": transcript,
             },
         )
@@ -495,6 +548,6 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             500,
             {
                 "error": "internal_error",
-                "message": "Ocorreu um erro inesperado.",
+                "message": "An unexpected error occurred.",
             },
         )
