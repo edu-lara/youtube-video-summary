@@ -694,9 +694,9 @@ Remove the environment when it is no longer required. Keep the dedicated IAM use
 
 In the AWS Amplify console:
 
-1. open the application;
-2. open the application settings;
-3. select **Delete app**;
+1. click on the application;
+2. click on **application settings**, followed by **general settings**;
+3. click the **Delete application** button;
 4. confirm the deletion.
 
 This removes the hosted frontend and its Amplify domain.

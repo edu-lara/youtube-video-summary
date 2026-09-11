@@ -694,9 +694,9 @@ Remova o ambiente quando ele não for mais necessário. Mantenha o usuário IAM 
 
 No console do AWS Amplify:
 
-1. abra a aplicação;
-2. abra as configurações da aplicação;
-3. selecione **Excluir aplicativo**;
+1. clique na aplicação;
+2. clique em **configurações da aplicação**, seguido de **configurações gerais**;
+3. clique no botão **Excluir aplicativo**;
 4. confirme a exclusão.
 
 Isso remove o frontend hospedado e seu domínio do Amplify.
