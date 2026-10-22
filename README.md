@@ -1,4 +1,4 @@
-# Weekend Annoying Task Challenge: YouTube Video Summary
+# Weekend Showcase Challenge: YouTube Video Summary
 
 🌐 **Language:** **English** \| [Português](README.pt-BR.md)
 
